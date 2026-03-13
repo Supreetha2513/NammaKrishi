@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import MyEquipment from './components/MyEquipment';
+import Bookings from './components/Bookings';
 import Payment from './components/Payment';
 import Earnings from './components/Earnings';
 import PlaceholderPage from './components/PlaceholderPage';
@@ -15,16 +16,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/equipment" element={<MyEquipment />} />
-        <Route 
-          path="/bookings" 
-          element={
-            <PlaceholderPage 
-              title="Bookings" 
-              icon="📅" 
-              message="View and manage your equipment bookings" 
-            />
-          } 
-        />
+        <Route path="/bookings" element={<Bookings />} />
         <Route path="/payments" element={<Payment />} />
         <Route path="/earnings" element={<Earnings />} />
         <Route 

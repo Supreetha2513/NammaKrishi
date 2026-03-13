@@ -169,9 +169,16 @@ function MyEquipment() {
     
     if (files.length === 0) return;
 
-    // Limit to 5 images
-    if (files.length + uploadedImages.length > 5) {
-      alert('You can upload a maximum of 5 images');
+    // Limit to 3 images to avoid Firestore size limits
+    if (files.length + uploadedImages.length > 3) {
+      alert('You can upload a maximum of 3 images (to keep data size small)');
+      return;
+    }
+
+    // Check individual file sizes
+    const oversizedFiles = files.filter(file => file.size > 3 * 1024 * 1024); // 3MB
+    if (oversizedFiles.length > 0) {
+      alert('Some images are too large. Please upload images under 3MB each.');
       return;
     }
 
@@ -192,16 +199,65 @@ function MyEquipment() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      // For now, store placeholder URLs since we don't have image upload backend yet
-      // In production, you would upload images to cloud storage first
+      // Compress and convert uploaded images to base64
+      let base64Images = [];
+      
+      if (uploadedImages.length > 0) {
+        // Function to compress and convert image to base64
+        const compressAndConvert = (file) => {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+              const img = new Image();
+              img.src = event.target.result;
+              img.onload = () => {
+                // Create canvas for compression
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Calculate new dimensions (max 800px width)
+                let width = img.width;
+                let height = img.height;
+                const maxWidth = 800;
+                
+                if (width > maxWidth) {
+                  height = (height * maxWidth) / width;
+                  width = maxWidth;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Draw and compress
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Convert to base64 with compression (0.7 quality)
+                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(compressedBase64);
+              };
+              img.onerror = reject;
+            };
+            reader.onerror = reject;
+          });
+        };
+
+        base64Images = await Promise.all(
+          uploadedImages.map(file => compressAndConvert(file))
+        );
+      }
+
+      // Prepare equipment data with compressed base64 images
       const equipmentData = {
         ...formData,
-        image_url: imagePreviewUrls[0] || '',
-        image_urls: imagePreviewUrls
+        image_url: base64Images[0] || imagePreviewUrls[0] || formData.image_url || '',
+        image_urls: base64Images.length > 0 ? base64Images : (imagePreviewUrls.length > 0 ? imagePreviewUrls : formData.image_urls || [])
       };
 
+      // Save equipment data to Firestore
       if (editingEquipment) {
         await api.put(`/equipment/${editingEquipment.id}`, equipmentData);
       } else {
@@ -209,10 +265,16 @@ function MyEquipment() {
       }
       
       setShowModal(false);
+      setLoading(false);
       fetchEquipment();
+      
+      // Reset upload state
+      setUploadedImages([]);
+      setImagePreviewUrls([]);
     } catch (error) {
       console.error('Error saving equipment:', error);
-      alert('Failed to save equipment. Please try again.');
+      setLoading(false);
+      alert(error.response?.data?.message || 'Failed to save equipment. Please try again.');
     }
   };
 
@@ -990,7 +1052,7 @@ function MyEquipment() {
                   )}
 
                   <div className="media-note">
-                    <strong>📸 Media Gallery:</strong> Upload up to 5 high-quality images of your equipment.
+                    <strong>📸 Media Gallery:</strong> Upload up to 3 images (automatically compressed for faster loading).
                     The first image will be used as the primary display image.
                   </div>
                 </div>
