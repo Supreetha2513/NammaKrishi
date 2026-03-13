@@ -1,0 +1,356 @@
+/* Earnings Page Styles */
+.earnings-page {
+  display: flex;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.earnings-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.earnings-section h2 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  color: #333;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card.total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+}
+
+.stat-card.month {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+}
+
+.stat-card.pending {
+  background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+  color: white;
+  border: none;
+}
+
+.stat-card.paid {
+  background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+  color: white;
+  border: none;
+}
+
+.stat-icon {
+  font-size: 40px;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+
+.stat-card.total .stat-label,
+.stat-card.month .stat-label,
+.stat-card.pending .stat-label,
+.stat-card.paid .stat-label {
+  color: white;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* Chart Section */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.chart-btn {
+  padding: 8px 16px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.chart-btn:hover {
+  background: #f5f5f5;
+}
+
+.chart-btn.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.chart-container {
+  margin-top: 20px;
+}
+
+/* Equipment Earnings */
+.equipment-earnings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.equipment-earning-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s;
+}
+
+.equipment-earning-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.equipment-rank {
+  font-size: 24px;
+  font-weight: 700;
+  color: #667eea;
+  width: 50px;
+  text-align: center;
+}
+
+.equipment-info {
+  flex: 1;
+}
+
+.equipment-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.equipment-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.bookings-count {
+  font-weight: 600;
+}
+
+.percentage {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 3px;
+  transition: width 1s ease-in-out;
+}
+
+.equipment-earnings {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2e7d32;
+  min-width: 150px;
+  text-align: right;
+}
+
+/* Monthly Table */
+.monthly-table {
+  overflow-x: auto;
+}
+
+.monthly-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.monthly-table thead {
+  background: #f5f7fa;
+}
+
+.monthly-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.monthly-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+  color: #333;
+}
+
+.monthly-table td.amount {
+  font-weight: 700;
+  color: #2e7d32;
+  text-align: right;
+}
+
+.monthly-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+/* No Data State */
+.no-data {
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.no-data-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  opacity: 0.3;
+}
+
+.no-data h3 {
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.no-data p {
+  margin: 0;
+  font-size: 15px;
+  color: #666;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-container {
+    overflow-x: auto;
+  }
+
+  .equipment-earning-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .equipment-rank {
+    width: 100%;
+    text-align: left;
+  }
+
+  .equipment-earnings {
+    width: 100%;
+    text-align: left;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .chart-controls {
+    width: 100%;
+  }
+
+  .chart-btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .earnings-section {
+    padding: 16px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 28px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .equipment-info h3 {
+    font-size: 14px;
+  }
+
+  .equipment-stats {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .equipment-earnings {
+    font-size: 18px;
+  }
+}

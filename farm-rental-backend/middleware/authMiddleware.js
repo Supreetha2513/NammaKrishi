@@ -6,9 +6,9 @@ const verifyOwner = async (req, res, next) => {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const userDoc = await admin.firestore().collection("users").doc(decodedToken.uid).get();
+    const userDoc = await admin.firestore().collection("owners").doc(decodedToken.uid).get();
     
-    if (!userDoc.exists || userDoc.data().role !== "owner") {
+    if (!userDoc.exists) {
       return res.status(403).json({ error: "Not an owner" });
     }
     

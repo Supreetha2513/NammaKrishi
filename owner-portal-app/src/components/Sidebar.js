@@ -16,7 +16,8 @@ function Sidebar({ isOpen, onClose }) {
     { path: '/dashboard', icon: '📊', label: 'Dashboard' },
     { path: '/equipment', icon: '🚜', label: 'My Equipment' },
     { path: '/bookings', icon: '📅', label: 'Bookings' },
-    { path: '/earnings', icon: '💰', label: 'Earnings' },
+    { path: '/payments', icon: '💳', label: 'Payments' },
+    { path: '/earnings', icon: '💸', label: 'Earnings' },
     { path: '/ai-assistant', icon: '🤖', label: 'AI Assistant' },
   ];
 

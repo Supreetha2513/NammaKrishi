@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import MyEquipment from './components/MyEquipment';
+import Payment from './components/Payment';
+import Earnings from './components/Earnings';
 import PlaceholderPage from './components/PlaceholderPage';
 import './App.css';
 
@@ -23,16 +25,8 @@ function App() {
             />
           } 
         />
-        <Route 
-          path="/earnings" 
-          element={
-            <PlaceholderPage 
-              title="Earnings" 
-              icon="💰" 
-              message="Track your revenue and financial analytics" 
-            />
-          } 
-        />
+        <Route path="/payments" element={<Payment />} />
+        <Route path="/earnings" element={<Earnings />} />
         <Route 
           path="/ai-assistant" 
           element={

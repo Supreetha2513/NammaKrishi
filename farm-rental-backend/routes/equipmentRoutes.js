@@ -12,6 +12,9 @@ router.get('/:id', equipmentController.getEquipmentById);
 // Get equipment analytics (maintenance, availability, bookings)
 router.get('/:id/analytics', equipmentController.getEquipmentAnalytics);
 
+// Get calendar availability for equipment
+router.get('/:id/calendar', equipmentController.getCalendarAvailability);
+
 // Add new equipment
 router.post('/', equipmentController.addEquipment);
 
@@ -23,6 +26,9 @@ router.post('/pricing', equipmentController.updateDynamicPricing);
 
 // Set blackout dates
 router.post('/blackout-dates', equipmentController.setBlackoutDates);
+
+// Remove blackout dates
+router.delete('/blackout-dates', equipmentController.removeBlackoutDates);
 
 // Update equipment
 router.put('/:id', equipmentController.updateEquipment);

@@ -479,9 +479,174 @@ const equipmentController = {
   },
 
   // Set blackout dates (unavailable periods)
+  // Set blackout dates (unavailable periods)
   setBlackoutDates: async (req, res) => {
     try {
-      const { equipment_id, dates } = req.body;
+      console.log('Set blackout dates request body:', req.body);
+      const { equipment_id, start_date, end_date } = req.body;
+
+      if (!equipment_id || !start_date || !end_date) {
+        return res.status(400).json({ 
+          error: 'Missing required fields: equipment_id, start_date, end_date' 
+        });
+      }
+
+      // Verify equipment ownership
+      const equipmentDoc = await db.collection("equipment").doc(equipment_id).get();
+      if (!equipmentDoc.exists) {
+        return res.status(404).json({ error: 'Equipment not found' });
+      }
+      
+      if (equipmentDoc.data().owner_id !== req.user.uid) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+
+      // Generate dates between start and end
+      const dates = [];
+      const currentDate = new Date(start_date);
+      const endDateTime = new Date(end_date);
+      
+      while (currentDate <= endDateTime) {
+        dates.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      console.log(`Blocking ${dates.length} dates for equipment ${equipment_id}`);
+
+      // Add blackout dates to availability calendar
+      const batch = db.batch();
+      
+      for (const date of dates) {
+        // Create a unique ID based on equipment and date
+        const dateStr = date.toISOString().split('T')[0];
+        const docId = `${equipment_id}_${dateStr}`;
+        const availabilityRef = db.collection("equipment_availability").doc(docId);
+        
+        batch.set(availabilityRef, {
+          equipment_id,
+          date: date,
+          availability_status: 'blackout',
+          booking_id: null,
+          created_at: new Date()
+        }, { merge: true });
+      }
+
+      await batch.commit();
+
+      console.log(`Successfully blocked ${dates.length} dates`);
+
+      res.json({
+        success: true,
+        message: 'Blackout dates set successfully',
+        dates_blocked: dates.length
+      });
+    } catch (error) {
+      console.error('Set blackout dates error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Get calendar availability for equipment
+  getCalendarAvailability: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { start_date, end_date } = req.query;
+
+      // Verify equipment exists and ownership
+      const equipmentDoc = await db.collection("equipment").doc(id).get();
+      if (!equipmentDoc.exists) {
+        return res.status(404).json({ error: 'Equipment not found' });
+      }
+
+      if (equipmentDoc.data().owner_id !== req.user.uid) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+
+      // Layer 1: Get confirmed bookings
+      let bookings = [];
+      try {
+        const bookingsSnapshot = await db.collection("bookings")
+          .where("equipment_id", "==", id)
+          .where("booking_status", "in", ["accepted", "pending"])
+          .get();
+        
+        bookings = bookingsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          start_date: doc.data().start_date?.toDate?.()?.toISOString(),
+          end_date: doc.data().end_date?.toDate?.()?.toISOString(),
+          status: doc.data().booking_status,
+          customer_id: doc.data().customer_id,
+          total_price: doc.data().total_price,
+          type: 'booking',
+          editable: false
+        }));
+      } catch (err) {
+        console.log('Bookings query error:', err.message);
+      }
+
+      // Layer 2: Get owner blackout dates
+      let blackoutDates = [];
+      try {
+        const availabilitySnapshot = await db.collection("equipment_availability")
+          .where("equipment_id", "==", id)
+          .where("availability_status", "==", "blackout")
+          .get();
+        
+        blackoutDates = availabilitySnapshot.docs.map(doc => ({
+          id: doc.id,
+          date: doc.data().date?.toDate?.()?.toISOString(),
+          type: 'blackout',
+          editable: true
+        }));
+      } catch (err) {
+        console.log('Availability query error:', err.message);
+      }
+
+      // Layer 3: Get dynamic pricing periods
+      let pricingPeriods = [];
+      try {
+        const pricingSnapshot = await db.collection("dynamic_pricing")
+          .where("equipment_id", "==", id)
+          .where("enabled", "==", true)
+          .get();
+        
+        pricingPeriods = pricingSnapshot.docs.map(doc => ({
+          id: doc.id,
+          start_date: doc.data().start_date?.toDate?.()?.toISOString(),
+          end_date: doc.data().end_date?.toDate?.()?.toISOString(),
+          price_multiplier: doc.data().price_multiplier,
+          season: doc.data().season,
+          type: 'pricing'
+        }));
+      } catch (err) {
+        console.log('Pricing query error:', err.message);
+      }
+
+      res.json({
+        success: true,
+        calendar_data: {
+          bookings,
+          blackout_dates: blackoutDates,
+          pricing_periods: pricingPeriods
+        }
+      });
+    } catch (error) {
+      console.error('Get calendar availability error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Remove blackout dates
+  removeBlackoutDates: async (req, res) => {
+    try {
+      console.log('Remove blackout dates request body:', req.body);
+      const { equipment_id, start_date, end_date } = req.body;
+
+      if (!equipment_id || !start_date || !end_date) {
+        return res.status(400).json({ 
+          error: 'Missing required fields: equipment_id, start_date, end_date' 
+        });
+      }
 
       // Verify equipment ownership
       const equipmentDoc = await db.collection("equipment").doc(equipment_id).get();
@@ -489,28 +654,54 @@ const equipmentController = {
         return res.status(403).json({ error: 'Not authorized' });
       }
 
-      // Add blackout dates to availability calendar
+      // Generate dates between start and end
+      const dates = [];
+      const currentDate = new Date(start_date);
+      const endDateTime = new Date(end_date);
+      
+      while (currentDate <= endDateTime) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const docId = `${equipment_id}_${dateStr}`;
+        dates.push(docId);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      console.log(`Removing ${dates.length} blackout dates`);
+
+      // Remove blackout dates
       const batch = db.batch();
       
-      for (const dateStr of dates) {
-        const availabilityRef = db.collection("equipment_availability").doc();
-        batch.set(availabilityRef, {
-          equipment_id,
-          date: new Date(dateStr),
-          availability_status: 'blackout',
-          booking_id: null,
-          created_at: new Date()
-        });
+      for (const docId of dates) {
+        const availabilityRef = db.collection("equipment_availability").doc(docId);
+        batch.delete(availabilityRef);
       }
 
       await batch.commit();
 
+      // Check for pending equipment requests and send SMS notifications
+      try {
+        const equipmentData = equipmentDoc.data();
+        const requestsSnapshot = await db.collection("equipment_requests")
+          .where("equipment_name", "==", equipmentData.name)
+          .where("request_status", "==", "pending")
+          .where("location", "==", equipmentData.location)
+          .get();
+
+        if (!requestsSnapshot.empty) {
+          // TODO: Trigger SMS notifications to farmers
+          console.log(`Found ${requestsSnapshot.size} pending requests for ${equipmentData.name}`);
+        }
+      } catch (err) {
+        console.log('SMS notification check error:', err.message);
+      }
+
       res.json({
         success: true,
-        message: 'Blackout dates set successfully'
+        message: 'Blackout dates removed successfully',
+        dates_unblocked: dates.length
       });
     } catch (error) {
-      console.error('Set blackout dates error:', error);
+      console.error('Remove blackout dates error:', error);
       res.status(500).json({ error: error.message });
     }
   }

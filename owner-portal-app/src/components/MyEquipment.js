@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import api from '../services/api';
 import Sidebar from './Sidebar';
 import './MyEquipment.css';
@@ -20,6 +22,15 @@ function MyEquipment() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterVerification, setFilterVerification] = useState('all');
 
+  // Calendar states
+  const [selectedEquipmentForCalendar, setSelectedEquipmentForCalendar] = useState(null);
+  const [calendarData, setCalendarData] = useState(null);
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [selectedDateRange, setSelectedDateRange] = useState(null);
+  const [hoveredDate, setHoveredDate] = useState(null);
+  const [showDateBlockModal, setShowDateBlockModal] = useState(false);
+  const [dateRangeToBlock, setDateRangeToBlock] = useState(null);
+
   // Form states
   const [formData, setFormData] = useState({
     name: '',
@@ -39,6 +50,8 @@ function MyEquipment() {
   });
 
   const [activeModalTab, setActiveModalTab] = useState('basic'); // basic, specs, pricing, media
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
 
   const categories = ['Tractor', 'Harvester', 'Plough', 'Seed Drill', 'Sprayer', 'Rotavator', 'Thresher', 'Other'];
   const fuelTypes = ['Diesel', 'Petrol', 'Electric', 'Hybrid'];
@@ -115,6 +128,8 @@ function MyEquipment() {
     });
     setEditingEquipment(null);
     setActiveModalTab('basic');
+    setUploadedImages([]);
+    setImagePreviewUrls([]);
     setShowModal(true);
   };
 
@@ -137,17 +152,60 @@ function MyEquipment() {
     });
     setEditingEquipment(eq);
     setActiveModalTab('basic');
+    setUploadedImages([]);
+    // Show existing images if any
+    if (eq.image_url) {
+      setImagePreviewUrls([eq.image_url]);
+    } else if (eq.image_urls && eq.image_urls.length > 0) {
+      setImagePreviewUrls(eq.image_urls);
+    } else {
+      setImagePreviewUrls([]);
+    }
     setShowModal(true);
+  };
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (files.length === 0) return;
+
+    // Limit to 5 images
+    if (files.length + uploadedImages.length > 5) {
+      alert('You can upload a maximum of 5 images');
+      return;
+    }
+
+    // Create preview URLs
+    const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+    
+    setUploadedImages([...uploadedImages, ...files]);
+    setImagePreviewUrls([...imagePreviewUrls, ...newPreviewUrls]);
+  };
+
+  const removeImage = (index) => {
+    const newImages = uploadedImages.filter((_, i) => i !== index);
+    const newPreviews = imagePreviewUrls.filter((_, i) => i !== index);
+    
+    setUploadedImages(newImages);
+    setImagePreviewUrls(newPreviews);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
+      // For now, store placeholder URLs since we don't have image upload backend yet
+      // In production, you would upload images to cloud storage first
+      const equipmentData = {
+        ...formData,
+        image_url: imagePreviewUrls[0] || '',
+        image_urls: imagePreviewUrls
+      };
+
       if (editingEquipment) {
-        await api.put(`/equipment/${editingEquipment.id}`, formData);
+        await api.put(`/equipment/${editingEquipment.id}`, equipmentData);
       } else {
-        await api.post('/equipment', formData);
+        await api.post('/equipment', equipmentData);
       }
       
       setShowModal(false);
@@ -184,6 +242,159 @@ function MyEquipment() {
       console.error('Error toggling availability:', error);
       alert('Failed to update availability');
     }
+  };
+
+  // Calendar functions
+  const fetchCalendarData = async (equipmentId) => {
+    try {
+      setLoadingCalendar(true);
+      const response = await api.get(`/equipment/${equipmentId}/calendar`);
+      setCalendarData(response.data.calendar_data);
+    } catch (error) {
+      console.error('Error fetching calendar data:', error);
+      alert('Failed to load calendar data');
+    } finally {
+      setLoadingCalendar(false);
+    }
+  };
+
+  const handleEquipmentSelectForCalendar = (eq) => {
+    setSelectedEquipmentForCalendar(eq);
+    fetchCalendarData(eq.id);
+  };
+
+  const handleDateClick = (date) => {
+    if (!selectedDateRange) {
+      // First click - start of range
+      setSelectedDateRange({ start: date, end: null });
+    } else if (!selectedDateRange.end) {
+      // Second click - end of range
+      const start = selectedDateRange.start;
+      const end = date;
+      
+      // Normalize the range
+      const normalizedStart = end < start ? end : start;
+      const normalizedEnd = end < start ? start : end;
+      
+      // Set the date range and show modal
+      setDateRangeToBlock({ start: normalizedStart, end: normalizedEnd });
+      setShowDateBlockModal(true);
+      setSelectedDateRange(null);
+    }
+  };
+
+  const handleBlockDates = async (shouldBlock) => {
+    if (!selectedEquipmentForCalendar || !dateRangeToBlock) return;
+
+    try {
+      const requestData = {
+        equipment_id: selectedEquipmentForCalendar.id,
+        start_date: dateRangeToBlock.start.toISOString().split('T')[0],
+        end_date: dateRangeToBlock.end.toISOString().split('T')[0]
+      };
+
+      if (shouldBlock) {
+        await api.post('/equipment/blackout-dates', requestData);
+      } else {
+        // For DELETE, we need to send data as params or in config
+        await api.delete('/equipment/blackout-dates', { data: requestData });
+      }
+
+      // Refresh calendar data
+      fetchCalendarData(selectedEquipmentForCalendar.id);
+      setShowDateBlockModal(false);
+      setDateRangeToBlock(null);
+    } catch (error) {
+      console.error('Error updating dates:', error);
+      alert(`Failed to ${shouldBlock ? 'block' : 'unblock'} dates: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
+  const getTileClassName = ({ date, view }) => {
+    if (view !== 'month' || !calendarData) return '';
+
+    const dateStr = date.toISOString().split('T')[0];
+    const classes = [];
+
+    // Check for confirmed bookings (Layer 1 - highest priority)
+    const booking = calendarData.bookings?.find(b => {
+      if (!b.start_date || !b.end_date) return false;
+      const start = new Date(b.start_date).toISOString().split('T')[0];
+      const end = new Date(b.end_date).toISOString().split('T')[0];
+      return dateStr >= start && dateStr <= end;
+    });
+
+    if (booking) {
+      classes.push(booking.status === 'accepted' ? 'calendar-booked' : 'calendar-pending');
+      return classes.join(' ');
+    }
+
+    // Check for blackout dates (Layer 2)
+    const isBlackout = calendarData.blackout_dates?.some(bd => {
+      if (!bd.date) return false;
+      const blackoutDate = new Date(bd.date).toISOString().split('T')[0];
+      return dateStr === blackoutDate;
+    });
+
+    if (isBlackout) {
+      classes.push('calendar-blackout');
+      return classes.join(' ');
+    }
+
+    // Check for dynamic pricing (Layer 3)
+    const pricing = calendarData.pricing_periods?.find(p => {
+      if (!p.start_date || !p.end_date) return false;
+      const start = new Date(p.start_date).toISOString().split('T')[0];
+      const end = new Date(p.end_date).toISOString().split('T')[0];
+      return dateStr >= start && dateStr <= end;
+    });
+
+    if (pricing) {
+      classes.push(pricing.price_multiplier > 1 ? 'calendar-peak-pricing' : 'calendar-off-peak');
+    } else {
+      classes.push('calendar-available');
+    }
+
+    return classes.join(' ');
+  };
+
+  const getTileContent = ({ date, view }) => {
+    if (view !== 'month' || !calendarData) return null;
+
+    const dateStr = date.toISOString().split('T')[0];
+
+    // Check for bookings
+    const booking = calendarData.bookings?.find(b => {
+      if (!b.start_date || !b.end_date) return false;
+      const start = new Date(b.start_date).toISOString().split('T')[0];
+      const end = new Date(b.end_date).toISOString().split('T')[0];
+      return dateStr >= start && dateStr <= end;
+    });
+
+    if (booking) {
+      return (
+        <div className="calendar-tile-content">
+          <span className="calendar-icon">📦</span>
+        </div>
+      );
+    }
+
+    // Check for blackout
+    const isBlackout = calendarData.blackout_dates?.some(bd => {
+      if (!bd.date) return false;
+      const blackoutDate = new Date(bd.date).toISOString().split('T')[0];
+      return dateStr === blackoutDate;
+    });
+
+    if (isBlackout) {
+      return (
+        <div className="calendar-tile-content">
+          <span className="calendar-icon">🚫</span>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const getStatusBadgeClass = (status) => {
@@ -286,17 +497,115 @@ function MyEquipment() {
         <h2>📅 Availability Calendar</h2>
         <p>Manage booking schedules and blackout dates for your equipment</p>
       </div>
-      <div className="calendar-placeholder">
-        <div className="placeholder-icon">📆</div>
-        <h3>Calendar Feature Coming Soon</h3>
-        <p>Interactive calendar to manage equipment availability, confirmed bookings, and blackout dates</p>
-        <ul className="feature-list">
-          <li>✓ View confirmed bookings</li>
-          <li>✓ Set blackout dates for personal use</li>
-          <li>✓ Prevent double-bookings</li>
-          <li>✓ Seasonal demand highlights</li>
-        </ul>
-      </div>
+
+      {!selectedEquipmentForCalendar ? (
+        <div className="calendar-equipment-selector">
+          <h3>Select Equipment to View Calendar</h3>
+          <div className="equipment-grid">
+            {filteredEquipment.map((eq) => (
+              <div 
+                key={eq.id} 
+                className="equipment-card clickable"
+                onClick={() => handleEquipmentSelectForCalendar(eq)}
+              >
+                <div className="equipment-image">
+                  {eq.image_url || eq.image_urls?.[0] ? (
+                    <img src={eq.image_url || eq.image_urls[0]} alt={eq.name} />
+                  ) : (
+                    <div className="placeholder-image">📷</div>
+                  )}
+                </div>
+                <div className="equipment-info">
+                  <h4>{eq.name}</h4>
+                  <p className="equipment-category">{eq.category}</p>
+                  <div className={getStatusBadgeClass(eq.availability_status)}>
+                    {eq.availability_status}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="calendar-container">
+          <div className="calendar-selected-equipment">
+            <button 
+              className="back-button"
+              onClick={() => {
+                setSelectedEquipmentForCalendar(null);
+                setCalendarData(null);
+              }}
+            >
+              ← Back to Equipment List
+            </button>
+            <div className="selected-equipment-info">
+              <h3>{selectedEquipmentForCalendar.name}</h3>
+              <p>{selectedEquipmentForCalendar.category} • {selectedEquipmentForCalendar.location}</p>
+            </div>
+          </div>
+
+          <div className="calendar-legend">
+            <h4>Legend:</h4>
+            <div className="legend-items">
+              <div className="legend-item">
+                <span className="legend-color calendar-available"></span>
+                <span>Available</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color calendar-booked"></span>
+                <span>Confirmed Booking</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color calendar-pending"></span>
+                <span>Pending Booking</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color calendar-blackout"></span>
+                <span>Blackout Date</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color calendar-peak-pricing"></span>
+                <span>Peak Pricing</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="calendar-instructions">
+            <p>📌 <strong>How to use:</strong> Click a start date, then click an end date to block or unblock a date range</p>
+          </div>
+
+          {loadingCalendar ? (
+            <div className="loading-calendar">Loading calendar...</div>
+          ) : (
+            <div className="react-calendar-wrapper">
+              <Calendar
+                onChange={handleDateClick}
+                tileClassName={getTileClassName}
+                tileContent={getTileContent}
+                minDate={new Date()}
+                showNeighboringMonth={false}
+              />
+            </div>
+          )}
+
+          {calendarData && (
+            <div className="calendar-summary">
+              <div className="summary-card">
+                <h4>📦 Confirmed Bookings</h4>
+                <p className="summary-count">{calendarData.bookings?.length || 0}</p>
+              </div>
+              <div className="summary-card">
+                <h4>🚫 Blackout Dates</h4>
+                <p className="summary-count">{calendarData.blackout_dates?.length || 0}</p>
+              </div>
+              <div className="summary-card">
+                <h4>💰 Pricing Periods</h4>
+                <p className="summary-count">{calendarData.pricing_periods?.length || 0}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -451,25 +760,25 @@ function MyEquipment() {
                 className={`modal-tab ${activeModalTab === 'basic' ? 'active' : ''}`}
                 onClick={() => setActiveModalTab('basic')}
               >
-                Basic Info
+                <span className="tab-number">1</span> Basic Info
               </button>
               <button 
                 className={`modal-tab ${activeModalTab === 'specs' ? 'active' : ''}`}
                 onClick={() => setActiveModalTab('specs')}
               >
-                Technical Specs
+                <span className="tab-number">2</span> Technical Specs
               </button>
               <button 
                 className={`modal-tab ${activeModalTab === 'pricing' ? 'active' : ''}`}
                 onClick={() => setActiveModalTab('pricing')}
               >
-                Pricing
+                <span className="tab-number">3</span> Pricing
               </button>
               <button 
                 className={`modal-tab ${activeModalTab === 'media' ? 'active' : ''}`}
                 onClick={() => setActiveModalTab('media')}
               >
-                Media
+                <span className="tab-number">4</span> Media
               </button>
             </div>
 
@@ -644,39 +953,199 @@ function MyEquipment() {
               {activeModalTab === 'media' && (
                 <div className="modal-tab-content">
                   <div className="form-group">
-                    <label>Primary Image URL</label>
-                    <input
-                      type="url"
-                      value={formData.image_url}
-                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                      placeholder="https://example.com/image.jpg"
-                    />
+                    <label>📸 Equipment Photos (Max 5)</label>
+                    <div className="file-upload-area">
+                      <input
+                        type="file"
+                        id="image-upload"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageUpload}
+                        className="file-input"
+                      />
+                      <label htmlFor="image-upload" className="file-upload-label">
+                        <span className="upload-icon">📷</span>
+                        <span className="upload-text">Click to upload images</span>
+                        <span className="upload-hint">Drag and drop or click to browse</span>
+                      </label>
+                    </div>
                   </div>
 
-                  <div className="image-preview">
-                    {formData.image_url ? (
-                      <img src={formData.image_url} alt="Preview" />
-                    ) : (
-                      <div className="no-preview">No image to preview</div>
-                    )}
-                  </div>
+                  {imagePreviewUrls.length > 0 && (
+                    <div className="image-gallery">
+                      {imagePreviewUrls.map((url, index) => (
+                        <div key={index} className="image-preview-item">
+                          <img src={url} alt={`Preview ${index + 1}`} />
+                          <button 
+                            type="button"
+                            className="remove-image-btn"
+                            onClick={() => removeImage(index)}
+                          >
+                            ×
+                          </button>
+                          {index === 0 && <span className="primary-badge">Primary</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="media-note">
-                    <strong>📸 Media Gallery:</strong> File upload functionality will be added soon.
-                    For now, use image URLs from hosting services.
+                    <strong>📸 Media Gallery:</strong> Upload up to 5 high-quality images of your equipment.
+                    The first image will be used as the primary display image.
                   </div>
                 </div>
               )}
 
+              {/* Modal Actions - Different buttons based on active tab */}
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingEquipment ? 'Update Equipment' : 'Add Equipment'}
-                </button>
+                
+                {activeModalTab === 'basic' && (
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => setActiveModalTab('specs')}
+                  >
+                    Next →
+                  </button>
+                )}
+
+                {activeModalTab === 'specs' && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="btn btn-outline"
+                      onClick={() => setActiveModalTab('basic')}
+                    >
+                      ← Previous
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-primary"
+                      onClick={() => setActiveModalTab('pricing')}
+                    >
+                      Next →
+                    </button>
+                  </>
+                )}
+
+                {activeModalTab === 'pricing' && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="btn btn-outline"
+                      onClick={() => setActiveModalTab('specs')}
+                    >
+                      ← Previous
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-primary"
+                      onClick={() => setActiveModalTab('media')}
+                    >
+                      Next →
+                    </button>
+                  </>
+                )}
+
+                {activeModalTab === 'media' && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="btn btn-outline"
+                      onClick={() => setActiveModalTab('pricing')}
+                    >
+                      ← Previous
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      {editingEquipment ? '✓ Update Equipment' : '✓ Add Equipment'}
+                    </button>
+                  </>
+                )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Date Block/Unblock Modal */}
+      {showDateBlockModal && dateRangeToBlock && (
+        <div className="modal-overlay" onClick={() => setShowDateBlockModal(false)}>
+          <div className="modal-content date-block-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📅 Manage Date Availability</h2>
+            </div>
+
+            <div className="date-block-modal-body">
+              <div className="date-range-display">
+                <div className="date-box">
+                  <span className="date-label">From</span>
+                  <span className="date-value">{dateRangeToBlock.start.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}</span>
+                </div>
+                <div className="date-arrow">→</div>
+                <div className="date-box">
+                  <span className="date-label">To</span>
+                  <span className="date-value">{dateRangeToBlock.end.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}</span>
+                </div>
+              </div>
+
+              <div className="date-block-options">
+                <div className="option-card block-option">
+                  <div className="option-icon">🚫</div>
+                  <div className="option-content">
+                    <h3>Block Dates</h3>
+                    <p>Mark these dates as unavailable for bookings. Good for personal use or maintenance.</p>
+                  </div>
+                </div>
+
+                <div className="option-card unblock-option">
+                  <div className="option-icon">✅</div>
+                  <div className="option-content">
+                    <h3>Unblock Dates</h3>
+                    <p>Remove any existing blackout periods and make these dates available for rent.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowDateBlockModal(false);
+                  setDateRangeToBlock(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={() => handleBlockDates(true)}
+              >
+                🚫 Block Dates
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-success" 
+                onClick={() => handleBlockDates(false)}
+              >
+                ✅ Unblock Dates
+              </button>
+            </div>
           </div>
         </div>
       )}

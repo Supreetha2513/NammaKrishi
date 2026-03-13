@@ -1,0 +1,396 @@
+/* Payment Page Styles */
+.payment-page {
+  display: flex;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.payment-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+/* UPI Card */
+.upi-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 32px;
+  color: white;
+}
+
+.upi-display {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.upi-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.upi-value {
+  font-size: 24px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.status-badge.active {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.upi-note {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.upi-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.upi-edit label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.upi-input {
+  padding: 14px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.upi-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.upi-input:focus {
+  outline: none;
+  border-color: white;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.upi-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.upi-setup {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.upi-setup p {
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.stat-icon {
+  font-size: 36px;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+}
+
+/* Payments List */
+.payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.payment-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  transition: all 0.3s;
+}
+
+.payment-card.pending {
+  border-color: #ffa726;
+  background: #fff3e0;
+}
+
+.payment-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.payment-info {
+  flex: 1;
+}
+
+.payment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.equipment-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.payment-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.payment-details {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Transactions Table */
+.transactions-table {
+  overflow-x: auto;
+}
+
+.transactions-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transactions-table thead {
+  background: #f5f7fa;
+}
+
+.transactions-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.transactions-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+  color: #333;
+}
+
+.transactions-table td.amount {
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.transactions-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.completed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.pending {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+/* No Data */
+.no-data {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.no-data p {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+  background: white;
+  color: #333;
+  border: 2px solid #e0e0e0;
+}
+
+.btn-secondary:hover {
+  background: #f5f5f5;
+}
+
+.btn-outline {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-outline:hover {
+  background: #667eea;
+  color: white;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #66bb6a, #388e3c);
+  color: white;
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 187, 106, 0.4);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .payment-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .upi-actions {
+    flex-direction: column;
+  }
+
+  .upi-actions .btn {
+    width: 100%;
+  }
+
+  .transactions-table {
+    font-size: 12px;
+  }
+
+  .transactions-table th,
+  .transactions-table td {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .payment-section {
+    padding: 16px;
+  }
+
+  .upi-card {
+    padding: 20px;
+  }
+
+  .upi-value {
+    font-size: 18px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+}
