@@ -5,3 +5,11 @@ serviceAccountKey.json
 uploads/
 .DS_Store
 *.log
+skit-hackathon-*.json
+*-adminsdk-*.json
+firebase-adminsdk.json
+
+# General ignores
+node_modules/
+.env
+*.log

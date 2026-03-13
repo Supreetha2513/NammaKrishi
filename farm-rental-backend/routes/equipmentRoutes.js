@@ -3,6 +3,34 @@ const express = require('express');
 const router = express.Router();
 const equipmentController = require('../controllers/equipmentController');
 
-// Add your equipment routes here
+// Get all equipment for logged-in owner
+router.get('/', equipmentController.getMyEquipment);
+
+// Get single equipment by ID
+router.get('/:id', equipmentController.getEquipmentById);
+
+// Get equipment analytics (maintenance, availability, bookings)
+router.get('/:id/analytics', equipmentController.getEquipmentAnalytics);
+
+// Add new equipment
+router.post('/', equipmentController.addEquipment);
+
+// Add maintenance log
+router.post('/maintenance', equipmentController.addMaintenanceLog);
+
+// Update dynamic pricing
+router.post('/pricing', equipmentController.updateDynamicPricing);
+
+// Set blackout dates
+router.post('/blackout-dates', equipmentController.setBlackoutDates);
+
+// Update equipment
+router.put('/:id', equipmentController.updateEquipment);
+
+// Toggle availability
+router.patch('/:id/availability', equipmentController.toggleAvailability);
+
+// Delete equipment
+router.delete('/:id', equipmentController.deleteEquipment);
 
 module.exports = router;

@@ -13,6 +13,7 @@ app.use(express.json({ limit: "10mb" })); // for base64 images
 app.use("/api/auth", require("./routes/authRoutes"));
 
 // Protected owner routes
+app.use("/api/dashboard", verifyOwner, require("./routes/dashboardRoutes"));
 app.use("/api/equipment", verifyOwner, require("./routes/equipmentRoutes"));
 app.use("/api/bookings", verifyOwner, require("./routes/bookingRoutes"));
 app.use("/api/ai", verifyOwner, require("./routes/aiRoutes"));

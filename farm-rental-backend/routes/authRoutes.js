@@ -3,6 +3,9 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 
-// Add your auth routes here
+// Public routes
+router.post('/register', authController.register);
+router.post('/login', authController.login);
+router.get('/me', authController.getCurrentUser);
 
 module.exports = router;
