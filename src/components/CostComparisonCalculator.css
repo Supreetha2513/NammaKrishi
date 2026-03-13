@@ -1,0 +1,170 @@
+.cost-comparison-calculator {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cost-comparison-calculator h2 {
+  margin-top: 0;
+  color: #1f2937;
+  text-align: center;
+}
+
+.cost-comparison-calculator form {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.form-group input {
+  padding: 10px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.form-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.calculate-btn,
+.reset-btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calculate-btn {
+  background: #10b981;
+  color: white;
+}
+
+.calculate-btn:hover {
+  background: #059669;
+}
+
+.reset-btn {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.reset-btn:hover {
+  background: #d1d5db;
+}
+
+.result-section {
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.result-section h3 {
+  margin-top: 0;
+  color: #1f2937;
+  text-align: center;
+}
+
+.results-container {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.cost-card {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+  border: 2px solid #e5e7eb;
+}
+
+.cost-card h4 {
+  margin: 0 0 8px 0;
+  color: #6b7280;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.cost-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #10b981;
+  margin: 8px 0;
+}
+
+.cost-card p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.vs-divider {
+  text-align: center;
+  font-weight: 700;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.recommendation {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border-left: 4px solid #10b981;
+}
+
+.recommendation.labor {
+  border-left-color: #3b82f6;
+}
+
+.recommendation svg {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.recommendation.labor svg {
+  color: #3b82f6;
+}
+
+.recommendation h4 {
+  margin: 0 0 4px 0;
+  color: #1f2937;
+}
+
+.recommendation p {
+  margin: 4px 0;
+  color: #6b7280;
+  font-size: 14px;
+}

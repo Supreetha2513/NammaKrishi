@@ -1,0 +1,20 @@
+{
+  "name": "firebase-functions",
+  "description": "Cloud Functions for Farm Equipment Rental",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.5.0",
+    "firebase-functions": "^4.3.1",
+    "cors": "^2.8.5",
+    "axios": "^1.6.0",
+    "razorpay": "^2.9.2"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  }
+}
