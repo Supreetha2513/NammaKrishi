@@ -28,7 +28,7 @@
 
 /* UPI Card */
 .upi-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
   border-radius: 12px;
   padding: 32px;
   color: white;
@@ -295,7 +295,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
   color: white;
 }
 
@@ -316,12 +316,12 @@
 
 .btn-outline {
   background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  color: #56ab2f;
+  border: 2px solid #56ab2f;
 }
 
 .btn-outline:hover {
-  background: #667eea;
+  background: #56ab2f;
   color: white;
 }
 

@@ -38,9 +38,332 @@
   flex: 1;
 }
 
-.user-info span {
-  color: #666;
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  position: relative;
+}
+
+.notification-bell {
+  background: #f0f0f0;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.3s;
+}
+
+.notification-bell:hover {
+  background: #e0e0e0;
+  transform: scale(1.05);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ff4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 10px;
+  padding: 2px 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.user-info:hover {
+  background: #f5f5f5;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.user-name {
+  color: #333;
+  font-weight: 500;
   font-size: 14px;
+}
+
+.dropdown-arrow {
+  color: #999;
+  font-size: 10px;
+  transition: transform 0.3s;
+}
+
+/* Notification Dropdown */
+.notification-dropdown {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  width: 380px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+}
+
+/* Profile Dropdown */
+.profile-dropdown {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  width: 380px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-section {
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.profile-header {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.profile-avatar-large {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 24px;
+}
+
+.profile-details h3 {
+  margin: 0 0 5px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.profile-email {
+  margin: 0;
+  color: #666;
+  font-size: 13px;
+}
+
+.profile-info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.profile-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Notifications Section */
+.notifications-section {
+  padding: 15px 20px;
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+.notification-dropdown .notifications-section {
+  border-bottom: none;
+  max-height: 500px;
+}
+
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.notifications-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.mark-all-read {
+  background: none;
+  border: none;
+  color: #56ab2f;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.mark-all-read:hover {
+  text-decoration: underline;
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.no-notifications {
+  text-align: center;
+  color: #999;
+  padding: 30px 20px;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.notification-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.notification-item:hover {
+  background: #f8f9fa;
+}
+
+.notification-item.unread {
+  background: #f0f4ff;
+}
+
+.notification-item.unread:hover {
+  background: #e6edff;
+}
+
+.notif-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notif-content {
+  flex: 1;
+}
+
+.notif-content h5 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}
+
+.notif-content p {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.notif-time {
+  font-size: 11px;
+  color: #999;
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56ab2f;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Profile Actions */
+.profile-actions {
+  display: flex;
+  padding: 15px 20px;
+  gap: 10px;
+}
+
+.profile-action-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  transition: all 0.2s;
+}
+
+.profile-action-btn:hover {
+  background: #f5f5f5;
+  border-color: #56ab2f;
+}
+
+.logout-btn {
+  color: #ff4444;
+  border-color: #ffcccc;
+}
+
+.logout-btn:hover {
+  background: #fff5f5;
+  border-color: #ff4444;
 }
 
 .content-area {
@@ -80,7 +403,7 @@
 
 .stat-icon {
   font-size: 36px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
   width: 60px;
   height: 60px;
   border-radius: 12px;
@@ -161,7 +484,7 @@
 }
 
 .booking-item:hover {
-  border-color: #667eea;
+  border-color: #56ab2f;
   background: #f8f9ff;
 }
 
@@ -179,7 +502,7 @@
 .booking-price {
   font-size: 16px;
   font-weight: 600;
-  color: #667eea;
+  color: #56ab2f;
   margin: 4px 0;
 }
 
@@ -262,8 +585,135 @@
 
 .demand-fill {
   height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #56ab2f 0%, #a8e063 100%);
   transition: width 0.5s;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.quick-action-btn {
+  padding: 15px 20px;
+  background: white;
+  border-radius: 12px;
+  border: 2px solid #56ab2f;
+  color: #56ab2f;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.1);
+}
+
+.quick-action-btn:hover {
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+/* Payment Cards */
+.payment-card {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  padding: 20px;
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+}
+
+.payment-card h3 {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  opacity: 0.95;
+}
+
+.payment-card .amount {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.payment-card .label {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.pending-card {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+/* Top Equipment Cards */
+.top-equipment-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.top-equipment-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 20px;
+}
+
+.top-equipment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.top-equipment-item {
+  padding: 15px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.top-equipment-item:last-child {
+  border-bottom: none;
+}
+
+.equipment-rank {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  margin-right: 15px;
+}
+
+.equipment-details {
+  flex: 1;
+}
+
+.equipment-name {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 15px;
+  margin-bottom: 3px;
+}
+
+.equipment-bookings {
+  font-size: 13px;
+  color: #718096;
+}
+
+.equipment-earnings {
+  font-weight: 700;
+  color: #11998e;
+  font-size: 18px;
 }
 
 /* Mobile Responsive */
@@ -324,6 +774,69 @@
   .section-card {
     padding: 16px;
   }
+
+  .quick-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .quick-action-btn {
+    padding: 12px 15px;
+    font-size: 14px;
+  }
+
+  .top-equipment-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .equipment-rank {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .dropdown-arrow {
+    display: none;
+  }
+
+  .notification-bell {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .notification-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+    min-width: 16px;
+  }
+
+  .notification-dropdown,
+  .profile-dropdown {
+    width: 320px;
+    right: 10px;
+    top: 55px;
+  }
+
+  .profile-avatar-large {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .profile-details h3 {
+    font-size: 16px;
+  }
+
+  .notifications-section {
+    max-height: 300px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -345,5 +858,50 @@
 
   .user-info {
     display: none;
+  }
+
+  .notification-dropdown,
+  .profile-dropdown {
+    width: calc(100vw - 30px);
+    right: 15px;
+    left: 15px;
+    top: 50px;
+  }
+
+  .notifications-section {
+    max-height: 250px;
+  }
+
+  .profile-actions {
+    flex-direction: column;
+  }
+
+  .notification-bell {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  .quick-actions {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .quick-action-btn {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .payment-card .amount,
+  .pending-card .amount {
+    font-size: 24px;
+  }
+
+  .equipment-name {
+    font-size: 14px;
+  }
+
+  .equipment-earnings {
+    font-size: 16px;
   }
 }

@@ -51,12 +51,12 @@
 }
 
 .tab-btn:hover {
-  color: #667eea;
+  color: #56ab2f;
 }
 
 .tab-btn.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
+  color: #56ab2f;
+  border-bottom-color: #56ab2f;
 }
 
 /* Equipment Grid */
@@ -157,7 +157,7 @@
 }
 
 .equipment-category {
-  color: #667eea;
+  color: #56ab2f;
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 8px;
@@ -197,7 +197,7 @@
 .metric-value {
   font-size: 18px;
   font-weight: 700;
-  color: #667eea;
+  color: #56ab2f;
 }
 
 .equipment-pricing {
@@ -275,7 +275,7 @@
 }
 
 .btn-primary {
-  background: #667eea;
+  background: #56ab2f;
   color: white;
 }
 
@@ -285,7 +285,7 @@
 }
 
 .btn-ai {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
   color: white;
   margin-right: 12px;
 }
@@ -333,8 +333,8 @@
 
 .btn-outline {
   background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  color: #56ab2f;
+  border: 2px solid #56ab2f;
 }
 
 .btn-outline:hover {
@@ -434,7 +434,7 @@
 }
 
 .category-tag {
-  background: #667eea;
+  background: #56ab2f;
   color: white;
   padding: 4px 12px;
   border-radius: 12px;
@@ -596,13 +596,13 @@
 
 .modal-tab:hover {
   background: white;
-color: #667eea;
+color: #56ab2f;
 }
 
 .modal-tab.active {
   background: white;
-  color: #667eea;
-  border-bottom-color: #667eea;
+  color: #56ab2f;
+  border-bottom-color: #56ab2f;
 }
 
 .tab-number {
@@ -621,7 +621,7 @@ color: #667eea;
 }
 
 .modal-tab.active .tab-number {
-  background: #667eea;
+  background: #56ab2f;
   color: white;
 }
 
@@ -662,7 +662,7 @@ color: #667eea;
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #56ab2f;
 }
 
 .form-row {
@@ -682,14 +682,14 @@ color: #667eea;
 .media-note {
   padding: 16px;
   background: #e7f3ff;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #56ab2f;
   border-radius: 8px;
   margin-top: 20px;
 }
 
 .pricing-note strong,
 .media-note strong {
-  color: #667eea;
+  color: #56ab2f;
 }
 
 /* File Upload Styles */
@@ -707,7 +707,7 @@ color: #667eea;
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  border: 2px dashed #667eea;
+  border: 2px dashed #56ab2f;
   border-radius: 12px;
   background: #f8f9ff;
   cursor: pointer;
@@ -727,7 +727,7 @@ color: #667eea;
 .upload-text {
   font-size: 16px;
   font-weight: 600;
-  color: #667eea;
+  color: #56ab2f;
   margin-bottom: 6px;
 }
 
@@ -791,7 +791,7 @@ color: #667eea;
   position: absolute;
   bottom: 6px;
   left: 6px;
-  background: #667eea;
+  background: #56ab2f;
   color: white;
   padding: 4px 10px;
   border-radius: 12px;
@@ -1126,7 +1126,7 @@ color: #667eea;
   gap: 20px;
   margin-bottom: 32px;
   padding: 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
   border-radius: 12px;
   color: white;
 }

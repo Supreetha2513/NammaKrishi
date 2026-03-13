@@ -21,6 +21,7 @@ app.use("/api/maintenance", verifyOwner, require("./routes/maintenanceRoutes"));
 app.use("/api/analytics", verifyOwner, require("./routes/analyticsRoutes"));
 app.use("/api/payments", verifyOwner, require("./routes/paymentRoutes"));
 app.use("/api/earnings", verifyOwner, require("./routes/earningsRoutes"));
+app.use("/api/notifications", verifyOwner, require("./routes/notificationRoutes"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Owner Backend running on http://localhost:${PORT}`));

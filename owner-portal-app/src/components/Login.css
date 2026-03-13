@@ -1,6 +1,6 @@
 .login-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -66,13 +66,13 @@
 }
 
 .role-selector input[type="radio"]:checked + .role-btn {
-  background: #667eea;
+  background: #56ab2f;
   color: white;
-  border-color: #667eea;
+  border-color: #56ab2f;
 }
 
 .role-btn:hover {
-  border-color: #667eea;
+  border-color: #56ab2f;
 }
 
 .form-group {
@@ -99,7 +99,7 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #56ab2f;
 }
 
 .btn {
@@ -115,7 +115,7 @@
 }
 
 .btn-primary {
-  background: #667eea;
+  background: #56ab2f;
   color: white;
 }
 
@@ -138,7 +138,7 @@
 }
 
 .switch-form a {
-  color: #667eea;
+  color: #56ab2f;
   text-decoration: none;
   font-weight: 600;
 }

@@ -653,7 +653,7 @@ function MyEquipment() {
 
   return (
     <div className="dashboard-container">
-      <Sidebar showSidebar={showSidebar} setShowSidebar={setShowSidebar} />
+      <Sidebar isOpen={showSidebar} onClose={() => setShowSidebar(false)} />
       
       <div className="main-content">
         <div className="topbar">
