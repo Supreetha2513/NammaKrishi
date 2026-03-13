@@ -9,14 +9,17 @@ import './HomePage.css';
 const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const [equipment, setEquipment] = useState([]);
   const [filteredEquipment, setFilteredEquipment] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
+
   const [locations, setLocations] = useState([]);
   const [categories, setCategories] = useState([]);
 
@@ -26,50 +29,73 @@ const HomePage = () => {
 
   const fetchEquipment = async () => {
     try {
-      const data = await equipmentService.getAllEquipment();
+      const data = await equipmentService.getAllEquipmentWithDynamicPricing();
       setEquipment(data);
 
-      // Extract unique categories and locations
-      const uniqueCategories = [...new Set(data.map((item) => item.category))];
-      const uniqueLocations = [...new Set(data.map((item) => item.location))];
+      console.log("Fetched equipment:", data);
+
+      // Extract unique categories
+      const uniqueCategories = [
+        ...new Set(
+          data.map(item => item.category?.toLowerCase().trim())
+        )
+      ];
+
+      // Extract unique locations
+      const uniqueLocations = [
+        ...new Set(
+          data.map(item => item.location?.toLowerCase().trim())
+        )
+      ];
 
       setCategories(uniqueCategories);
       setLocations(uniqueLocations);
 
       applyFilters(data, searchText, selectedCategory, selectedLocation, priceRange);
+
     } catch (error) {
-      console.error('Error fetching equipment:', error);
+      console.error("Error fetching equipment:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = (data = equipment, search, category, location, price) => {
-    let filtered = data;
+  const applyFilters = (
+    data = equipment,
+    search = searchText,
+    category = selectedCategory,
+    location = selectedLocation,
+    price = priceRange
+  ) => {
 
-    // Filter by search text
+    let filtered = [...data];
+
+    // Search filter
     if (search) {
       const searchLower = search.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchLower) ||
-          item.description.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(item =>
+        item.name?.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower)
       );
     }
 
-    // Filter by category
-    if (category !== 'all') {
-      filtered = filtered.filter((item) => item.category === category);
+    // Category filter
+    if (category !== "all") {
+      filtered = filtered.filter(
+        item => item.category?.toLowerCase().trim() === category.toLowerCase().trim()
+      );
     }
 
-    // Filter by location
-    if (location !== 'all') {
-      filtered = filtered.filter((item) => item.location === location);
+    // Location filter
+    if (location !== "all") {
+      filtered = filtered.filter(
+        item => item.location?.toLowerCase().trim() === location.toLowerCase().trim()
+      );
     }
 
-    // Filter by price range
+    // Price filter
     filtered = filtered.filter(
-      (item) => item.price_per_day >= price[0] && item.price_per_day <= price[1]
+      item => item.price_per_day >= price[0] && item.price_per_day <= price[1]
     );
 
     setFilteredEquipment(filtered);
@@ -82,23 +108,38 @@ const HomePage = () => {
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
-    applyFilters(equipment, searchText, category, selectedLocation, priceRange);
+
+    if (category === "all") {
+      applyFilters(equipment, searchText, "all", selectedLocation, priceRange);
+    } else {
+      applyFilters(equipment, searchText, category, selectedLocation, priceRange);
+    }
   };
 
   const handleLocationChange = (location) => {
     setSelectedLocation(location);
-    applyFilters(equipment, searchText, selectedCategory, location, priceRange);
+
+    if (location === "all") {
+      applyFilters(equipment, searchText, selectedCategory, "all", priceRange);
+    } else {
+      applyFilters(equipment, searchText, selectedCategory, location, priceRange);
+    }
   };
 
   const handlePriceRangeChange = (e) => {
     const newPrice = parseInt(e.target.value);
     const newRange = [priceRange[0], newPrice];
+
     setPriceRange(newRange);
     applyFilters(equipment, searchText, selectedCategory, selectedLocation, newRange);
   };
 
   const handleEquipmentSelect = (equipmentItem) => {
-    navigate(`/equipment/${equipmentItem.id}`, { state: { equipment: equipmentItem } });
+    // Ensure no unresolved Promises in the equipmentItem object
+    const resolvedEquipmentItem = JSON.parse(JSON.stringify(equipmentItem));
+    navigate(`/equipment/${equipmentItem.id}`, {
+      state: { equipment: resolvedEquipmentItem }
+    });
   };
 
   const handleNavigateToCalculator = () => {
@@ -114,13 +155,16 @@ const HomePage = () => {
       <div className="auth-prompt">
         <h1>Farm Equipment Rental</h1>
         <p>Please sign in to search and rent equipment</p>
-        <button onClick={() => navigate('/login')}>Sign In</button>
+        <button onClick={() => navigate('/login')}>
+          Sign In
+        </button>
       </div>
     );
   }
 
   return (
     <div className="home-page">
+
       <div className="home-header">
         <div className="header-content">
           <h1>Farm Equipment Rental Marketplace</h1>
@@ -130,6 +174,7 @@ const HomePage = () => {
             <button className="action-btn" onClick={handleNavigateToCalculator}>
               💰 Cost Calculator
             </button>
+
             <button className="action-btn" onClick={handleNavigateToMyBookings}>
               📋 My Bookings
             </button>
@@ -139,15 +184,17 @@ const HomePage = () => {
 
       <div className="search-section">
         <div className="search-container">
+
           <VoiceSearchInput
-            onSearch={handleSearch}
+            onSearch={(results) => setFilteredEquipment(results)}
+            onCategoryChange={handleCategoryChange}
             language={selectedLanguage}
           />
 
           <div className="language-selector">
-            <label htmlFor="language">Language:</label>
+            <label>Language:</label>
+
             <select
-              id="language"
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
             >
@@ -158,21 +205,24 @@ const HomePage = () => {
               <option value="kn">ಕನ್ನಡ</option>
               <option value="ml">മലയാളം</option>
             </select>
+
           </div>
         </div>
       </div>
 
       <div className="filter-section">
         <div className="filters">
+
           <div className="filter-group">
-            <label htmlFor="category">Category:</label>
+            <label>Category:</label>
+
             <select
-              id="category"
               value={selectedCategory}
               onChange={(e) => handleCategoryChange(e.target.value)}
             >
               <option value="all">All Categories</option>
-              {categories.map((cat) => (
+
+              {categories.map(cat => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
@@ -181,37 +231,42 @@ const HomePage = () => {
           </div>
 
           <div className="filter-group">
-            <label htmlFor="location">Location:</label>
+            <label>Location:</label>
+
             <select
-              id="location"
               value={selectedLocation}
               onChange={(e) => handleLocationChange(e.target.value)}
             >
               <option value="all">All Locations</option>
-              {locations.map((loc) => (
+
+              {locations.map(loc => (
                 <option key={loc} value={loc}>
                   {loc}
                 </option>
               ))}
             </select>
+
           </div>
 
           <div className="filter-group">
-            <label htmlFor="price">Max Price: ₹{priceRange[1]}</label>
+            <label>Max Price: ₹{priceRange[1]}</label>
+
             <input
               type="range"
-              id="price"
               min="0"
-              max="50000"
+              max="60000"
               step="500"
               value={priceRange[1]}
               onChange={handlePriceRangeChange}
             />
+
           </div>
+
         </div>
       </div>
 
       <div className="results-section">
+
         {loading ? (
           <div className="loading">Loading equipment...</div>
         ) : filteredEquipment.length === 0 ? (
@@ -220,8 +275,9 @@ const HomePage = () => {
             <p>Try adjusting your search criteria.</p>
           </div>
         ) : (
+
           <div className="equipment-grid">
-            {filteredEquipment.map((item) => (
+            {filteredEquipment.map(item => (
               <EquipmentCard
                 key={item.id}
                 equipment={item}
@@ -229,8 +285,11 @@ const HomePage = () => {
               />
             ))}
           </div>
+
         )}
+
       </div>
+
     </div>
   );
 };

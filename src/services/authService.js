@@ -12,6 +12,9 @@ import { auth, db } from './firebase';
 class AuthService {
   async setPersistance() {
     try {
+      if (!auth) {
+        throw new Error('Firebase Auth not initialized');
+      }
       await setPersistence(auth, browserLocalPersistence);
     } catch (error) {
       console.error('Error setting persistence:', error);
@@ -20,6 +23,13 @@ class AuthService {
 
   async signup(email, password, userData) {
     try {
+      if (!auth) {
+        throw new Error('Firebase Auth is not initialized. Please ensure Firebase configuration is complete.');
+      }
+      if (!email || !password || !userData.phone) {
+        throw new Error('Email, password, and phone number are required');
+      }
+      console.log('Starting signup process for:', email);
       await this.setPersistance();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -29,12 +39,12 @@ class AuthService {
         displayName: userData.name,
       });
 
-      // Store user data in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
+      // Store user data in Firestore (new 'customers' collection)
+      await setDoc(doc(db, 'customers', user.uid), {
         id: user.uid,
         name: userData.name,
         email: email,
-        phone: userData.phone || '',
+        phone: userData.phone,
         language_preference: userData.language_preference || 'en',
         created_at: new Date(),
         profile_complete: true,
@@ -85,4 +95,5 @@ class AuthService {
   }
 }
 
-export default new AuthService();
+const authService = new AuthService();
+export default authService;

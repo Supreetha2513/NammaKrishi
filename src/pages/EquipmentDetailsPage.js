@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { calculateTotalPrice, formatCurrency, formatDate } from '../utils/helpers';
 import { toast } from 'react-toastify';
 import { FiArrowLeft, FiMapPin, FiClock } from 'react-icons/fi';
+import EquipmentService from '../services/equipmentService';
 import './EquipmentDetailsPage.css';
 
 const EquipmentDetailsPage = () => {
@@ -21,6 +22,7 @@ const EquipmentDetailsPage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
+  const [error, setError] = useState(null);
 
   if (!equipment) {
     return (
@@ -119,6 +121,22 @@ const EquipmentDetailsPage = () => {
     setShowPaymentModal(false);
   };
 
+  const handleNotifyMe = async () => {
+    try {
+      const request = {
+        customer_id: user.uid,
+        phone_number: user.phone || '',
+        equipment_name: equipment.name,
+        location: equipment.location,
+      };
+
+      await EquipmentService.notifyWhenAvailable(request);
+      toast.success('You will be notified when this equipment becomes available.');
+    } catch (error) {
+      toast.error('Failed to add notification request: ' + error.message);
+    }
+  };
+
   return (
     <div className="equipment-details-page">
       <button className="back-btn" onClick={() => navigate('/')}>
@@ -201,6 +219,12 @@ const EquipmentDetailsPage = () => {
           >
             {loading ? 'Processing...' : 'Book Now'}
           </button>
+
+          {equipment.availability_status === 'unavailable' && (
+            <button onClick={handleNotifyMe} className="notify-me-btn">
+              Notify Me When Available
+            </button>
+          )}
         </div>
       </div>
 

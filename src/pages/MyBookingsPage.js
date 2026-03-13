@@ -11,7 +11,7 @@ import './MyBookingsPage.css';
 const MyBookingsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [bookings, bookingsLoading] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [equipmentMap, setEquipmentMap] = useState({});
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);

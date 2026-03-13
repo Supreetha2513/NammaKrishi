@@ -37,12 +37,13 @@ const EquipmentCard = ({ equipment, onSelect }) => {
 
         <div className="pricing-row">
           <div className="price">
-            <span className="label">Per Day</span>
-            <span className="amount">{formatCurrency(equipment.price_per_day)}</span>
-          </div>
-          <div className="price">
-            <span className="label">Per Hour</span>
-            <span className="amount">{formatCurrency(equipment.price_per_hour)}</span>
+            <span className="label">Dynamic Price</span>
+            <span className="amount">
+              {formatCurrency(equipment.dynamic_price)}
+            </span>
+            {equipment.dynamic_price > equipment.price_per_day * 1.2 && (
+              <span className="high-demand">High Demand</span>
+            )}
           </div>
         </div>
 
