@@ -6,6 +6,7 @@ import MyEquipment from './components/MyEquipment';
 import Bookings from './components/Bookings';
 import Payment from './components/Payment';
 import Earnings from './components/Earnings';
+import AiAssistant from './components/AiAssistant';
 import PlaceholderPage from './components/PlaceholderPage';
 import './App.css';
 
@@ -19,16 +20,7 @@ function App() {
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/payments" element={<Payment />} />
         <Route path="/earnings" element={<Earnings />} />
-        <Route 
-          path="/ai-assistant" 
-          element={
-            <PlaceholderPage 
-              title="AI Assistant" 
-              icon="🤖" 
-              message="List equipment with AI-powered assistance" 
-            />
-          } 
-        />
+        <Route path="/ai-assistant" element={<AiAssistant />} />
         <Route 
           path="/customer-dashboard" 
           element={
