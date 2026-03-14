@@ -88,6 +88,7 @@ export const getPaymentStatus = (payment_status) => {
     success: { label: 'Success', color: '#10b981' },
     failed: { label: 'Failed', color: '#ef4444' },
     refunded: { label: 'Refunded', color: '#9ca3af' },
+    completed: { label: 'Completed', color: '#10b981' },
   };
-  return statusMap[payment_status] || { label: 'Unknown', color: '#9ca3af' };
+  return statusMap[payment_status] || { label: 'Completed', color: '#10b981' };
 };

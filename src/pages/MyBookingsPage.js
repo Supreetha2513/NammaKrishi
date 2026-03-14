@@ -17,67 +17,155 @@ import { storage } from "../services/firebase";
 import "./MyBookingsPage.css";
 
 const PaymentCard = ({ payment, onPaymentSubmit }) => {
+  const [paymentId, setPaymentId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("upi");
   const [transactionId, setTransactionId] = useState("");
   const [screenshotFile, setScreenshotFile] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!transactionId || !screenshotFile) {
-      alert("Please provide transaction ID and screenshot");
+    if (!paymentId || !transactionId || !screenshotFile) {
+      alert("Please fill all payment details including screenshot");
       return;
     }
 
-    onPaymentSubmit(payment.id, transactionId, screenshotFile);
+    setSubmitting(true);
+
+    // Wait 20 seconds
+    setTimeout(async () => {
+      setSubmitting(false);
+      setSubmitted(true);
+
+      // Execute all operations
+      await onPaymentSubmit(payment.id, {
+        payment_id: paymentId,
+        payment_method: paymentMethod,
+        upi_transaction_id: transactionId,
+        screenshot: screenshotFile,
+      });
+    }, 10000);
   };
+
+  if (submitted) {
+    return (
+      <div className="payment-card payment-done">
+        <div className="payment-header">
+          <h4>{payment.equipment_name}</h4>
+          <span className="status-badge" style={{ backgroundColor: "#10b981" }}>
+            ✓ Done
+          </span>
+        </div>
+
+        <div className="payment-details">
+          <div className="detail-item">
+            <span className="label">Dates:</span>
+            <span className="value">
+              {formatDate(payment.start_date)} to {formatDate(payment.end_date)}
+            </span>
+          </div>
+
+          <div className="detail-item">
+            <span className="label">Total Amount:</span>
+            <span className="value" style={{ color: "#10b981", fontSize: "16px" }}>
+              {formatCurrency(payment.amount)}
+            </span>
+          </div>
+
+          <div className="detail-item">
+            <span className="label">Payment Status:</span>
+            <span className="value">Completed</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="payment-card">
       <div className="payment-header">
         <h4>{payment.equipment_name}</h4>
-        <span className="status-badge" style={{ backgroundColor: "#f59e0b" }}>
-          Payment Pending
+        <span className="status-badge" style={{ backgroundColor: "#3b82f6" }}>
+          Awaiting Payment
         </span>
       </div>
 
       <div className="payment-details">
-        <p>
-          <strong>Owner ID:</strong> {payment.owner_id}
-        </p>
+        <div className="detail-item">
+          <span className="label">Dates:</span>
+          <span className="value">
+            {formatDate(payment.start_date)} to {formatDate(payment.end_date)}
+          </span>
+        </div>
 
-        <p>
-          <strong>Dates:</strong>{" "}
-          {formatDate(payment.start_date)} to {formatDate(payment.end_date)}
-        </p>
+        <div className="detail-item">
+          <span className="label">Total Amount:</span>
+          <span className="value">{formatCurrency(payment.amount)}</span>
+        </div>
 
-        <p>
-          <strong>Total Price:</strong> {formatCurrency(payment.total_price)}
-        </p>
-
-        {payment.upi_id && (
-          <p>
-            <strong>Owner UPI:</strong> {payment.upi_id}
-          </p>
+        {payment.owner_id && (
+          <div className="detail-item">
+            <span className="label">Owner ID:</span>
+            <span className="value">{payment.owner_id}</span>
+          </div>
         )}
       </div>
 
       <form onSubmit={handleSubmit} className="payment-form">
-        <input
-          type="text"
-          placeholder="Enter UPI Transaction ID"
-          value={transactionId}
-          onChange={(e) => setTransactionId(e.target.value)}
-          required
-        />
+        <div className="form-group">
+          <label>Payment ID</label>
+          <input
+            type="text"
+            placeholder="Enter Payment ID"
+            value={paymentId}
+            onChange={(e) => setPaymentId(e.target.value)}
+            required
+          />
+        </div>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setScreenshotFile(e.target.files[0])}
-          required
-        />
+        <div className="form-group">
+          <label>Payment Method</label>
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            required
+          >
+            <option value="upi">UPI</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="card">Card</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
 
-        <button type="submit">Submit Payment</button>
+        <div className="form-group">
+          <label>Transaction ID / Reference</label>
+          <input
+            type="text"
+            placeholder="Enter UPI Transaction ID or Reference Number"
+            value={transactionId}
+            onChange={(e) => setTransactionId(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Payment Screenshot</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setScreenshotFile(e.target.files[0])}
+            required
+          />
+          {screenshotFile && (
+            <span className="file-name">Selected: {screenshotFile.name}</span>
+          )}
+        </div>
+
+        <button type="submit" disabled={submitting || submitted} className="submit-btn">
+          {submitting ? "Submitting..." : submitted ? "Submitted" : "Submit Payment"}
+        </button>
       </form>
     </div>
   );
@@ -134,13 +222,31 @@ const MyBookingsPage = () => {
 
       setRequests(requestsData);
 
-      const paymentsData =
-        await BookingService.getBookingsByCustomerIdAndPaymentStatus(
-          user.uid,
-          "awaiting_payment"
-        );
+      // Fetch accepted requests for payments
+      let acceptedRequestsData =
+        await BookingService.getAcceptedRequestsByCustomerId(user.uid);
 
-      setPayments(paymentsData);
+      // Enrich accepted requests with amount calculation
+      acceptedRequestsData = await Promise.all(
+        acceptedRequestsData.map(async (request) => {
+          if (!request.amount && request.equipment_id) {
+            try {
+              const equipment = await EquipmentService.getEquipmentById(request.equipment_id);
+              const pricePerDay = equipment.price_per_day || 0;
+              const startDate = new Date(request.start_date);
+              const endDate = new Date(request.end_date);
+              const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+              request.amount = pricePerDay * Math.max(days, 1);
+            } catch (e) {
+              console.warn("Could not calculate amount for request", request.id, e);
+              request.amount = 0;
+            }
+          }
+          return request;
+        })
+      );
+
+      setPayments(acceptedRequestsData);
     } catch (error) {
       console.error("Error fetching bookings:", error);
     } finally {
@@ -176,42 +282,74 @@ const MyBookingsPage = () => {
     }
   };
 
-  const handlePaymentSubmit = async (paymentId, transactionId, screenshot) => {
+  const handlePaymentSubmit = async (requestId, paymentDetails) => {
     try {
-      const storageRef = ref(
+      // Upload screenshot to Firebase Storage
+      const screenshotRef = ref(
         storage,
-        `payment_screenshots/${paymentId}_${Date.now()}`
+        `payment_screenshots/${user.uid}/${requestId}_${Date.now()}`
       );
 
-      await uploadBytes(storageRef, screenshot);
+      await uploadBytes(screenshotRef, paymentDetails.screenshot);
+      const screenshotUrl = await getDownloadURL(screenshotRef);
 
-      const screenshotUrl = await getDownloadURL(storageRef);
+      // Find the request to get owner_id
+      const request = payments.find((p) => p.id === requestId);
+      if (!request) {
+        throw new Error("Request not found");
+      }
 
-      await BookingService.updatePayment(paymentId, {
-        upi_transaction_id: transactionId,
+      // Calculate amount from equipment pricing if not present
+      let amount = request.amount;
+      if (!amount && request.equipment_id) {
+        try {
+          const equipment = await EquipmentService.getEquipmentById(request.equipment_id);
+          const pricePerDay = equipment.price_per_day || 0;
+          const startDate = new Date(request.start_date);
+          const endDate = new Date(request.end_date);
+          const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+          amount = pricePerDay * Math.max(days, 1);
+        } catch (e) {
+          console.warn("Could not calculate amount", e);
+          amount = 0;
+        }
+      }
+
+      // Create payment record
+      const paymentRecord = {
+        request_id: requestId,
+        equipment_id: request.equipment_id,
+        equipment_name: request.equipment_name,
+        customer_id: user.uid,
+        owner_id: request.owner_id,
+        payment_id: paymentDetails.payment_id,
+        payment_method: paymentDetails.payment_method,
+        upi_transaction_id: paymentDetails.upi_transaction_id,
         payment_screenshot_url: screenshotUrl,
-        payment_status: "submitted",
-      });
+        amount: amount,
+        payment_status: "completed",
+        start_date: request.start_date,
+        end_date: request.end_date,
+      };
 
-      await BookingService.updateBookingPaymentStatus(paymentId, "submitted");
+      // Create payment in payments collection
+      await BookingService.createOrUpdatePayment(paymentRecord);
 
-      const payment = payments.find((p) => p.id === paymentId);
-
+      // Create notification
       await BookingService.createNotification({
         type: "payment_submitted",
-        booking_id: paymentId,
-        owner_id: payment.owner_id,
+        request_id: requestId,
+        owner_id: request.owner_id,
         customer_id: user.uid,
         message: "Customer submitted payment proof",
         created_at: Timestamp.now(),
       });
 
       alert("Payment submitted successfully");
-
       fetchData();
     } catch (error) {
       console.error("Payment submission error:", error);
-      alert("Failed to submit payment");
+      alert("Failed to submit payment: " + error.message);
     }
   };
 
@@ -325,13 +463,6 @@ const MyBookingsPage = () => {
 
                     <span
                       className="status-badge"
-                      style={{ backgroundColor: bookingStatus.color }}
-                    >
-                      {bookingStatus.label}
-                    </span>
-
-                    <span
-                      className="status-badge"
                       style={{ backgroundColor: paymentStatus.color }}
                     >
                       {paymentStatus.label}
@@ -381,13 +512,27 @@ const MyBookingsPage = () => {
             ) : payments.length === 0 ? (
               <div className="no-data">No pending payments</div>
             ) : (
-              payments.map((payment) => (
-                <PaymentCard
-                  key={payment.id}
-                  payment={payment}
-                  onPaymentSubmit={handlePaymentSubmit}
-                />
-              ))
+              <>
+                <div className="payments-summary">
+                  <div className="summary-card">
+                    <span className="summary-label">Total Pending Payments</span>
+                    <span className="summary-amount">
+                      {formatCurrency(
+                        payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+                      )}
+                    </span>
+                  </div>
+                </div>
+                <div className="payments-list">
+                  {payments.map((payment) => (
+                    <PaymentCard
+                      key={payment.id}
+                      payment={payment}
+                      onPaymentSubmit={handlePaymentSubmit}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
