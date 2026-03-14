@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { collection, query, where, getDocs, updateDoc, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import api from '../services/api';
 import Sidebar from './Sidebar';
 import './Bookings.css';
 
@@ -15,6 +14,8 @@ function Bookings() {
   const [showModal, setShowModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState(null);
+  const [ownerUpiId, setOwnerUpiId] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,75 +25,180 @@ function Bookings() {
       return;
     }
 
-    setupRealtimeListener();
+    fetchOwnerDetails();
+    fetchBookings();
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchBookings, 5000);
+    
+    return () => clearInterval(interval);
   }, [navigate]);
 
-  // Real-time Firestore listener
-  const setupRealtimeListener = () => {
-    const ownerId = localStorage.getItem('userId');
-    
-    const bookingsQuery = query(
-      collection(db, 'bookings'),
-      where('owner_id', '==', ownerId),
-      orderBy('created_at', 'desc')
-    );
+  // Fetch owner's UPI ID from owners collection
+  const fetchOwnerDetails = async () => {
+    try {
+      const ownerId = localStorage.getItem('userId');
+      if (!ownerId) return;
 
-    const unsubscribe = onSnapshot(bookingsQuery, async (snapshot) => {
-      const bookingsData = [];
-      
-      for (const doc of snapshot.docs) {
-        const bookingData = { id: doc.id, ...doc.data() };
-        
-        // Fetch equipment details
-        try {
-          const equipmentResponse = await api.get(`/equipment/${bookingData.equipment_id}`);
-          bookingData.equipment = equipmentResponse.data.equipment;
-        } catch (error) {
-          console.error('Error fetching equipment:', error);
-          bookingData.equipment = { name: 'Unknown Equipment' };
-        }
-        
-        // Format customer data (already in booking if available)
-        if (!bookingData.customer && bookingData.customer_id) {
-          bookingData.customer = { 
-            name: 'Customer',
-            email: bookingData.customer_email || 'N/A' 
-          };
-        }
-        
-        bookingsData.push(bookingData);
+      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
+      if (ownerDoc.exists()) {
+        const ownerData = ownerDoc.data();
+        setOwnerUpiId(ownerData.upi_id || '');
       }
-      
-      setBookings(bookingsData);
-      setFilteredBookings(bookingsData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error listening to bookings:', error);
-      setLoading(false);
-    });
+    } catch (error) {
+      console.error('Error fetching owner details:', error);
+    }
+  };
 
-    return () => unsubscribe();
+  // Fetch bookings directly from Firestore
+  const fetchBookings = async () => {
+    try {
+      const ownerId = localStorage.getItem('userId'); // Get logged-in owner's Firebase UID
+      
+      if (!ownerId) {
+        console.error('❌ Owner ID not found in localStorage');
+        console.log('💡 Please make sure you are logged in as an owner');
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔍 Fetching equipment requests for owner:', ownerId);
+
+      // Query equipment_requests collection where owner_id matches current owner
+      const q = query(
+        collection(db, 'equipment_requests'),
+        where('owner_id', '==', ownerId)
+      );
+
+      const snapshot = await getDocs(q);
+      
+      console.log(`📊 Found ${snapshot.size} equipment request(s)`);
+
+      // Extract ALL fields from each document
+      const requests = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('📄 Request:', {
+          id: doc.id,
+          customer_name: data.customer_name,
+          equipment_name: data.equipment_name,
+          status: data.request_status,
+          ...data
+        });
+        return {
+          id: doc.id,
+          ...data
+        };
+      });
+
+      setBookings(requests);
+      setFilteredBookings(requests);
+      setLoading(false);
+      
+      if (requests.length === 0) {
+        console.log('💡 No equipment requests found for this owner');
+        console.log('💡 Make sure customer portal is creating requests with owner_id:', ownerId);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching bookings:', error);
+      console.error('Error details:', error.message);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (statusFilter === 'all') {
       setFilteredBookings(bookings);
+    } else if (statusFilter === 'pending') {
+      // Show both 'pending' and 'open' status when filtering by pending
+      setFilteredBookings(bookings.filter(b => 
+        b.request_status === 'pending' || b.request_status === 'open'
+      ));
     } else {
-      setFilteredBookings(bookings.filter(b => b.booking_status === statusFilter));
+      setFilteredBookings(bookings.filter(b => b.request_status === statusFilter));
     }
   }, [statusFilter, bookings]);
 
   const handleAcceptBooking = async (bookingId) => {
     setActionLoading(true);
     try {
-      const response = await api.post(`/bookings/${bookingId}/accept`);
-      if (response.data.success) {
-        alert('Booking accepted successfully!');
-        setShowModal(false);
+      const booking = bookings.find(b => b.id === bookingId);
+      
+      if (!booking) {
+        alert('Booking not found');
+        return;
       }
+
+      // Check if required payment details exist
+      if (!booking.total_price) {
+        alert('❌ Payment details missing. Cannot accept booking without total price.');
+        setActionLoading(false);
+        return;
+      }
+
+      // Generate payment ID and transaction ID
+      const now = new Date();
+      const yearMonth = now.toISOString().slice(0, 7).replace('-', '');
+      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      const paymentId = `PAY_${yearMonth}_${randomNum}`;
+      const upiTransactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+      // Create payment document
+      const paymentData = {
+        amount: booking.total_price,
+        booking_id: booking.id,
+        created_at: Timestamp.now(),
+        customer_id: booking.customer_id || '',
+        customer_name: booking.customer_name || '',
+        equipment_id: booking.equipment_id || '',
+        equipment_name: booking.equipment_name || '',
+        owner_id: booking.owner_id || '',
+        payment_id: paymentId,
+        payment_method: 'UPI',
+        payment_screenshot_url: null,
+        payment_status: 'completed',
+        upi_transaction_id: upiTransactionId,
+        verified_at: Timestamp.now(),
+        owner_upi_id: ownerUpiId || ''
+      };
+
+      // Add payment to Firestore
+      const paymentDocRef = await addDoc(collection(db, 'payments'), paymentData);
+      
+      // Update request_status in equipment_requests to "accepted"
+      const requestRef = doc(db, 'equipment_requests', bookingId);
+      await updateDoc(requestRef, {
+        request_status: 'accepted',
+        payment_id: paymentId
+      });
+
+      // Create a new document in the bookings collection
+      await addDoc(collection(db, 'bookings'), {
+        equipment_id: booking.equipment_id,
+        owner_id: booking.owner_id,
+        customer_id: booking.customer_id,
+        customer_name: booking.customer_name || '',
+        equipment_name: booking.equipment_name || '',
+        location: booking.location || '',
+        start_date: booking.start_date,
+        end_date: booking.end_date,
+        booking_status: 'accepted',
+        payment_status: 'completed',
+        payment_id: paymentId,
+        created_at: Timestamp.now()
+      });
+
+      // Set payment details to display in modal
+      setPaymentDetails({
+        ...paymentData,
+        id: paymentDocRef.id,
+        created_at: now,
+        verified_at: now
+      });
+
+      alert('✅ Booking accepted successfully! Payment recorded.');
+      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error accepting booking:', error);
-      alert(error.response?.data?.message || 'Failed to accept booking');
+      alert('Failed to accept booking: ' + error.message);
     } finally {
       setActionLoading(false);
     }
@@ -101,17 +207,20 @@ function Bookings() {
   const handleRejectBooking = async (bookingId) => {
     setActionLoading(true);
     try {
-      const response = await api.post(`/bookings/${bookingId}/reject`, {
-        rejection_reason: rejectionReason
+      // Update request_status in equipment_requests to "rejected"
+      const requestRef = doc(db, 'equipment_requests', bookingId);
+      await updateDoc(requestRef, {
+        request_status: 'rejected',
+        rejection_reason: rejectionReason || 'Not specified'
       });
-      if (response.data.success) {
-        alert('Booking rejected');
-        setShowModal(false);
-        setRejectionReason('');
-      }
+
+      alert('❌ Booking rejected');
+      setShowModal(false);
+      setRejectionReason('');
+      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error rejecting booking:', error);
-      alert('Failed to reject booking');
+      alert('Failed to reject booking: ' + error.message);
     } finally {
       setActionLoading(false);
     }
@@ -122,10 +231,13 @@ function Bookings() {
     
     setActionLoading(true);
     try {
-      const response = await api.post(`/bookings/${bookingId}/complete`);
-      if (response.data.success) {
-        alert('Booking marked as completed!');
-      }
+      const requestRef = doc(db, 'equipment_requests', bookingId);
+      await updateDoc(requestRef, {
+        request_status: 'completed'
+      });
+
+      alert('🎉 Booking marked as completed!');
+      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error completing booking:', error);
       alert('Failed to complete booking');
@@ -136,6 +248,7 @@ function Bookings() {
 
   const openBookingModal = (booking) => {
     setSelectedBooking(booking);
+    setPaymentDetails(null); // Reset payment details
     setShowModal(true);
   };
 
@@ -144,7 +257,8 @@ function Bookings() {
       pending: { class: 'status-pending', text: 'Pending' },
       accepted: { class: 'status-accepted', text: 'Accepted' },
       rejected: { class: 'status-rejected', text: 'Rejected' },
-      completed: { class: 'status-completed', text: 'Completed' }
+      completed: { class: 'status-completed', text: 'Completed' },
+      open: { class: 'status-pending', text: 'Open' } // Map "open" to pending style
     };
     return badges[status] || { class: '', text: status };
   };
@@ -169,9 +283,9 @@ function Bookings() {
 
   const stats = {
     total: bookings.length,
-    pending: bookings.filter(b => b.booking_status === 'pending').length,
-    accepted: bookings.filter(b => b.booking_status === 'accepted').length,
-    completed: bookings.filter(b => b.booking_status === 'completed').length
+    pending: bookings.filter(b => b.request_status === 'pending' || b.request_status === 'open').length,
+    accepted: bookings.filter(b => b.request_status === 'accepted').length,
+    completed: bookings.filter(b => b.request_status === 'completed').length
   };
 
   if (loading) {
@@ -280,23 +394,31 @@ function Bookings() {
                 {filteredBookings.map(booking => (
                   <div 
                     key={booking.id} 
-                    className={`booking-card ${booking.booking_status}`}
+                    className={`booking-card ${booking.request_status}`}
                     onClick={() => openBookingModal(booking)}
                   >
                     <div className="booking-card-header">
                       <div className="equipment-info">
-                        <h3>{booking.equipment?.name || 'Equipment'}</h3>
-                        <p className="equipment-type">{booking.equipment?.category || 'N/A'}</p>
+                        <h3>{booking.equipment_name || 'Equipment'}</h3>
+                        <p className="equipment-type">📍 {booking.location || 'N/A'}</p>
                       </div>
-                      <span className={`status-badge ${getStatusBadge(booking.booking_status).class}`}>
-                        {getStatusBadge(booking.booking_status).text}
+                      <span className={`status-badge ${getStatusBadge(booking.request_status).class}`}>
+                        {getStatusBadge(booking.request_status).text}
                       </span>
                     </div>
 
                     <div className="booking-details">
                       <div className="detail-row">
                         <span className="label">👤 Customer:</span>
-                        <span className="value">{booking.customer?.name || 'N/A'}</span>
+                        <span className="value">{booking.customer_name || 'N/A'}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="label">🆔 Customer ID:</span>
+                        <span className="value" style={{fontSize: '0.85em', opacity: 0.8}}>{booking.customer_id || 'N/A'}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="label">🔧 Equipment ID:</span>
+                        <span className="value" style={{fontSize: '0.85em', opacity: 0.8}}>{booking.equipment_id || 'N/A'}</span>
                       </div>
                       <div className="detail-row">
                         <span className="label">📅 Dates:</span>
@@ -314,7 +436,7 @@ function Bookings() {
                       </div>
                     </div>
 
-                    {booking.booking_status === 'pending' && (
+                    {(booking.request_status === 'pending' || booking.request_status === 'open') && (
                       <div className="booking-actions">
                         <button 
                           className="btn-accept"
@@ -338,7 +460,7 @@ function Bookings() {
                       </div>
                     )}
 
-                    {booking.booking_status === 'accepted' && (
+                    {booking.request_status === 'accepted' && (
                       <div className="booking-actions">
                         <button 
                           className="btn-complete"
@@ -371,30 +493,62 @@ function Bookings() {
             
             <div className="modal-body">
               <div className="modal-section">
-                <h3>Equipment</h3>
-                <p className="equipment-name">{selectedBooking.equipment?.name}</p>
-                <p className="equipment-category">{selectedBooking.equipment?.category}</p>
+                <h3>📍 Equipment Details</h3>
+                <p className="equipment-name">{selectedBooking.equipment_name || 'N/A'}</p>
+                <p><strong>Equipment ID:</strong> {selectedBooking.equipment_id || 'N/A'}</p>
+                <p><strong>Location:</strong> 📍 {selectedBooking.location || 'N/A'}</p>
               </div>
 
               <div className="modal-section">
-                <h3>Customer Information</h3>
-                <p><strong>Name:</strong> {selectedBooking.customer?.name || 'N/A'}</p>
-                <p><strong>Email:</strong> {selectedBooking.customer?.email || 'N/A'}</p>
-                <p><strong>Phone:</strong> {selectedBooking.customer?.phone || 'N/A'}</p>
+                <h3>👤 Customer Information</h3>
+                <p><strong>Name:</strong> {selectedBooking.customer_name || 'N/A'}</p>
+                <p><strong>Customer ID:</strong> {selectedBooking.customer_id || 'N/A'}</p>
               </div>
 
               <div className="modal-section">
-                <h3>Booking Details</h3>
+                <h3>📅 Rental Details</h3>
                 <p><strong>Start Date:</strong> {formatDate(selectedBooking.start_date)}</p>
                 <p><strong>End Date:</strong> {formatDate(selectedBooking.end_date)}</p>
                 <p><strong>Duration:</strong> {calculateDuration(selectedBooking.start_date, selectedBooking.end_date)}</p>
-                <p><strong>Total Price:</strong> ₹{selectedBooking.total_price?.toLocaleString()}</p>
-                <p><strong>Status:</strong> <span className={`status-badge ${getStatusBadge(selectedBooking.booking_status).class}`}>
-                  {getStatusBadge(selectedBooking.booking_status).text}
-                </span></p>
+                <p><strong>Total Price:</strong> ₹{selectedBooking.total_price?.toLocaleString() || 'N/A'}</p>
               </div>
 
-              {selectedBooking.booking_status === 'pending' && (
+              <div className="modal-section">
+                <h3>ℹ️ Request Information</h3>
+                <p><strong>Request ID:</strong> {selectedBooking.id || 'N/A'}</p>
+                <p><strong>Owner ID:</strong> {selectedBooking.owner_id || 'N/A'}</p>
+                <p><strong>Status:</strong> <span className={`status-badge ${getStatusBadge(selectedBooking.request_status).class}`}>
+                  {getStatusBadge(selectedBooking.request_status).text}
+                </span></p>
+                {selectedBooking.created_at && (
+                  <p><strong>Created:</strong> {formatDate(selectedBooking.created_at.toDate ? selectedBooking.created_at.toDate() : selectedBooking.created_at)}</p>
+                )}
+                {selectedBooking.rejection_reason && (
+                  <p><strong>Rejection Reason:</strong> {selectedBooking.rejection_reason}</p>
+                )}
+              </div>
+
+              {paymentDetails && (
+                <div className="modal-section payment-details-section">
+                  <h3>💳 Payment Details</h3>
+                  <div className="payment-success-banner">
+                    <span className="success-icon">✅</span>
+                    <span>Payment Created Successfully!</span>
+                  </div>
+                  <p><strong>Payment ID:</strong> {paymentDetails.payment_id}</p>
+                  <p><strong>Transaction ID:</strong> {paymentDetails.upi_transaction_id}</p>
+                  <p><strong>Amount:</strong> ₹{paymentDetails.amount?.toLocaleString()}</p>
+                  <p><strong>Payment Method:</strong> {paymentDetails.payment_method}</p>
+                  <p><strong>Payment Status:</strong> <span className="status-badge status-completed">{paymentDetails.payment_status}</span></p>
+                  <p><strong>Customer:</strong> {paymentDetails.customer_name}</p>
+                  <p><strong>Equipment:</strong> {paymentDetails.equipment_name}</p>
+                  {ownerUpiId && <p><strong>Owner UPI ID:</strong> {ownerUpiId}</p>}
+                  <p><strong>Created At:</strong> {paymentDetails.created_at?.toLocaleString?.() || new Date(paymentDetails.created_at).toLocaleString()}</p>
+                  <p><strong>Verified At:</strong> {paymentDetails.verified_at?.toLocaleString?.() || new Date(paymentDetails.verified_at).toLocaleString()}</p>
+                </div>
+              )}
+
+              {(selectedBooking.request_status === 'pending' || selectedBooking.request_status === 'open') && (
                 <div className="modal-section">
                   <h3>Reject Booking</h3>
                   <textarea
@@ -408,7 +562,7 @@ function Bookings() {
             </div>
 
             <div className="modal-footer">
-              {selectedBooking.booking_status === 'pending' && (
+              {(selectedBooking.request_status === 'pending' || selectedBooking.request_status === 'open') && (
                 <>
                   <button 
                     className="btn-accept-large"
@@ -426,7 +580,7 @@ function Bookings() {
                   </button>
                 </>
               )}
-              {selectedBooking.booking_status === 'accepted' && (
+              {selectedBooking.status === 'accepted' && (
                 <button 
                   className="btn-complete-large"
                   onClick={() => handleCompleteBooking(selectedBooking.id)}

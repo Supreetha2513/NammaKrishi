@@ -108,7 +108,7 @@ function Dashboard() {
       // Get pending bookings count
       try {
         const bookingsRes = await api.get('/bookings');
-        const pendingBookings = bookingsRes.data.bookings?.filter(b => b.booking_status === 'pending').length || 0;
+        const pendingBookings = bookingsRes.data.bookings?.filter(b => b.status === 'pending').length || 0;
         setPendingActions(prev => ({ ...prev, bookings: pendingBookings }));
       } catch (err) {
         console.log('Bookings error:', err);
@@ -411,8 +411,8 @@ function Dashboard() {
                       </p>
                       <p className="booking-price">₹{booking.total_price?.toLocaleString()}</p>
                     </div>
-                    <div className={`booking-status status-${booking.booking_status}`}>
-                      {booking.booking_status}
+                    <div className={`booking-status status-${booking.status}`}>
+                      {booking.status}
                     </div>
                   </div>
                 ))}

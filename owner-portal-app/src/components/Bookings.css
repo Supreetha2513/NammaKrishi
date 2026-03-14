@@ -459,6 +459,38 @@
   box-shadow: 0 0 0 3px rgba(86, 171, 47, 0.1);
 }
 
+/* Payment Details Styling */
+.payment-details-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #22c55e;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.payment-success-banner {
+  background: #22c55e;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.payment-success-banner .success-icon {
+  font-size: 24px;
+}
+
+.payment-details-section p {
+  background: white;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border-left: 3px solid #22c55e;
+}
+
 .modal-footer {
   display: flex;
   gap: 12px;
