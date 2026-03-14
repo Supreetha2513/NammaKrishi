@@ -4,6 +4,12 @@ const router = express.Router();
 const bookingController = require('../controllers/bookingController');
 const authMiddleware = require('../middleware/authMiddleware');
 
+// Debug logging middleware
+router.use((req, res, next) => {
+  console.log(`🔵 Bookings Route: ${req.method} ${req.path}`);
+  next();
+});
+
 // Get all bookings for the authenticated owner
 router.get('/', authMiddleware, bookingController.getOwnerBookings);
 

@@ -6,27 +6,55 @@ const bookingController = {
   getOwnerBookings: async (req, res) => {
     try {
       const ownerId = req.user.uid;
+      console.log('📋 Fetching bookings for owner:', ownerId);
       
-      const bookingsSnapshot = await db.collection('bookings')
+      // DEBUG: Let's see ALL documents in equipment_request collection
+      const allRequestsSnapshot = await db.collection('equipment_request').get();
+      console.log(`🔍 DEBUG: Total documents in equipment_request collection: ${allRequestsSnapshot.size}`);
+      
+      if (allRequestsSnapshot.size > 0) {
+        console.log('📄 Sample documents from equipment_request:');
+        allRequestsSnapshot.docs.slice(0, 3).forEach(doc => {
+          const data = doc.data();
+          console.log(`  - Doc ${doc.id}: owner_id="${data.owner_id}", equipment_id="${data.equipment_id}", status="${data.status}"`);
+        });
+      }
+      
+      // Query equipment_request directly by owner_id (SIMPLIFIED APPROACH)
+      const requestsSnapshot = await db.collection('equipment_request')
         .where('owner_id', '==', ownerId)
-        .orderBy('created_at', 'desc')
         .get();
 
+      console.log(`✅ Found ${requestsSnapshot.size} requests for owner`);
+
       const bookings = [];
-      for (const doc of bookingsSnapshot.docs) {
+      for (const doc of requestsSnapshot.docs) {
         const bookingData = { id: doc.id, ...doc.data() };
+        console.log(`  📦 Request ${doc.id}: status=${bookingData.status}, equipment=${bookingData.equipment_id}`);
         
         // Fetch equipment details
-        const equipmentDoc = await db.collection('equipment').doc(bookingData.equipment_id).get();
-        bookingData.equipment = equipmentDoc.exists ? equipmentDoc.data() : null;
+        if (bookingData.equipment_id) {
+          const equipmentDoc = await db.collection('equipment').doc(bookingData.equipment_id).get();
+          bookingData.equipment = equipmentDoc.exists ? equipmentDoc.data() : null;
+        }
         
         // Fetch customer details
-        const customerDoc = await db.collection('users').doc(bookingData.customer_id).get();
-        bookingData.customer = customerDoc.exists ? customerDoc.data() : null;
+        if (bookingData.customer_id) {
+          const customerDoc = await db.collection('users').doc(bookingData.customer_id).get();
+          bookingData.customer = customerDoc.exists ? customerDoc.data() : null;
+        }
         
         bookings.push(bookingData);
       }
 
+      // Sort by created_at desc
+      bookings.sort((a, b) => {
+        const dateA = a.created_at?.toDate?.() || new Date(0);
+        const dateB = b.created_at?.toDate?.() || new Date(0);
+        return dateB - dateA;
+      });
+
+      console.log(`✨ Returning ${bookings.length} bookings`);
       res.json({ success: true, bookings });
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -54,9 +82,9 @@ const bookingController = {
       }
 
       // Check for double bookings
-      const conflictingBookings = await db.collection('bookings')
+      const conflictingBookings = await db.collection('equipment_request')
         .where('equipment_id', '==', equipment_id)
-        .where('booking_status', 'in', ['pending', 'accepted'])
+        .where('status', 'in', ['pending', 'accepted'])
         .get();
 
       const hasConflict = conflictingBookings.docs.some(doc => {
@@ -75,7 +103,7 @@ const bookingController = {
         });
       }
 
-      // Create booking
+      // Create equipment request
       const bookingData = {
         equipment_id,
         owner_id,
@@ -83,13 +111,13 @@ const bookingController = {
         start_date,
         end_date,
         total_price,
-        booking_status: 'pending',
+        status: 'pending',
         payment_status: 'unpaid',
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      const bookingRef = await db.collection('bookings').add(bookingData);
+      const bookingRef = await db.collection('equipment_request').add(bookingData);
 
       // Create notification for owner
       await db.collection('notifications').add({
@@ -119,10 +147,10 @@ const bookingController = {
       const { booking_id } = req.params;
       const ownerId = req.user.uid;
 
-      const bookingDoc = await db.collection('bookings').doc(booking_id).get();
+      const bookingDoc = await db.collection('equipment_request').doc(booking_id).get();
       
       if (!bookingDoc.exists) {
-        return res.status(404).json({ success: false, message: 'Booking not found' });
+        return res.status(404).json({ success: false, message: 'Request not found' });
       }
 
       const bookingData = bookingDoc.data();
@@ -133,9 +161,9 @@ const bookingController = {
       }
 
       // Check if still available (double-check)
-      const conflictingBookings = await db.collection('bookings')
+      const conflictingBookings = await db.collection('equipment_request')
         .where('equipment_id', '==', bookingData.equipment_id)
-        .where('booking_status', '==', 'accepted')
+        .where('status', '==', 'accepted')
         .get();
 
       const startDate = new Date(bookingData.start_date);
@@ -156,9 +184,24 @@ const bookingController = {
         });
       }
 
-      // Update booking status
-      await db.collection('bookings').doc(booking_id).update({
-        booking_status: 'accepted',
+      // Update request status and add to payments
+      await db.collection('equipment_request').doc(booking_id).update({
+        status: 'accepted',
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Add to payments collection
+      await db.collection('payments').add({
+        request_id: booking_id,
+        equipment_id: bookingData.equipment_id,
+        owner_id: ownerId,
+        customer_id: bookingData.customer_id,
+        amount: bookingData.total_price,
+        start_date: bookingData.start_date,
+        end_date: bookingData.end_date,
+        payment_status: 'pending',
+        payment_method: 'pending',
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
 
@@ -168,7 +211,7 @@ const bookingController = {
         notification_type: 'booking_accepted',
         title: 'Booking Accepted',
         message: 'Your booking request has been accepted',
-        booking_id: booking_id,
+        request_id: booking_id,
         status: 'unread',
         created_at: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -187,10 +230,10 @@ const bookingController = {
       const { rejection_reason } = req.body;
       const ownerId = req.user.uid;
 
-      const bookingDoc = await db.collection('bookings').doc(booking_id).get();
+      const bookingDoc = await db.collection('equipment_request').doc(booking_id).get();
       
       if (!bookingDoc.exists) {
-        return res.status(404).json({ success: false, message: 'Booking not found' });
+        return res.status(404).json({ success: false, message: 'Request not found' });
       }
 
       const bookingData = bookingDoc.data();
@@ -200,9 +243,9 @@ const bookingController = {
         return res.status(403).json({ success: false, message: 'Unauthorized' });
       }
 
-      // Update booking status
-      await db.collection('bookings').doc(booking_id).update({
-        booking_status: 'rejected',
+      // Update request status (stays in equipment_request)
+      await db.collection('equipment_request').doc(booking_id).update({
+        status: 'rejected',
         rejection_reason: rejection_reason || 'Not available',
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -213,7 +256,7 @@ const bookingController = {
         notification_type: 'booking_rejected',
         title: 'Booking Rejected',
         message: rejection_reason || 'Your booking request was not accepted',
-        booking_id: booking_id,
+        request_id: booking_id,
         status: 'unread',
         created_at: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -231,10 +274,10 @@ const bookingController = {
       const { booking_id } = req.params;
       const ownerId = req.user.uid;
 
-      const bookingDoc = await db.collection('bookings').doc(booking_id).get();
+      const bookingDoc = await db.collection('equipment_request').doc(booking_id).get();
       
       if (!bookingDoc.exists) {
-        return res.status(404).json({ success: false, message: 'Booking not found' });
+        return res.status(404).json({ success: false, message: 'Request not found' });
       }
 
       const bookingData = bookingDoc.data();
@@ -244,8 +287,8 @@ const bookingController = {
         return res.status(403).json({ success: false, message: 'Unauthorized' });
       }
 
-      await db.collection('bookings').doc(booking_id).update({
-        booking_status: 'completed',
+      await db.collection('equipment_request').doc(booking_id).update({
+        status: 'completed',
         completed_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -272,10 +315,10 @@ const bookingController = {
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
 
-      // Get all accepted/pending bookings for this equipment
-      const bookingsSnapshot = await db.collection('bookings')
+      // Get all accepted/pending requests for this equipment
+      const bookingsSnapshot = await db.collection('equipment_request')
         .where('equipment_id', '==', equipment_id)
-        .where('booking_status', 'in', ['pending', 'accepted'])
+        .where('status', 'in', ['pending', 'accepted'])
         .get();
 
       const conflicts = bookingsSnapshot.docs.filter(doc => {

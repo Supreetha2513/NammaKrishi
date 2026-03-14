@@ -18,6 +18,7 @@ function Sidebar({ isOpen, onClose }) {
     { path: '/bookings', icon: '📅', label: 'Bookings' },
     { path: '/payments', icon: '💳', label: 'Payments' },
     { path: '/earnings', icon: '💸', label: 'Earnings' },
+    { path: 'https://lungcancer-cn-4.onrender.com', icon: '💬', label: 'Chat', external: true },
     { path: '/ai-assistant', icon: '🤖', label: 'AI Assistant' },
   ];
 
@@ -37,9 +38,13 @@ function Sidebar({ isOpen, onClose }) {
               key={item.path}
               href={item.path}
               className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener noreferrer' : undefined}
               onClick={(e) => {
-                e.preventDefault();
-                navigate(item.path);
+                if (!item.external) {
+                  e.preventDefault();
+                  navigate(item.path);
+                }
                 onClose();
               }}
             >
