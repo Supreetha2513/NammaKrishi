@@ -43,7 +43,7 @@ function Login() {
         if (role === 'owner') {
           navigate('/dashboard');
         } else {
-          window.location.href = 'https://trumusefinal-production.up.railway.app/';
+          window.location.href ='https://customer-2005.web.app/my-bookings/'
         }
       }, 1500);
     } catch (error) {
@@ -70,7 +70,7 @@ function Login() {
         if (data.user.role === 'owner') {
           navigate('/dashboard');
         } else {
-          window.location.href = 'https://trumusefinal-production.up.railway.app/';
+          window.location.href = 'https://customer-2005.web.app/my-bookings/'
         }
       }, 1500);
     } catch (error) {

@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "nammakrishi-b0612"
+  },
+  "targets": {
+    "nammakrishi-b0612": {
+      "hosting": {
+        "owner": [
+          "owner-nammakrishi"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
