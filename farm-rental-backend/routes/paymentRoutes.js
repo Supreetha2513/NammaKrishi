@@ -9,6 +9,9 @@ router.get('/', paymentController.getOwnerPayments);
 // Get payment statistics
 router.get('/stats', paymentController.getPaymentStats);
 
+// Get equipment-level payment summary from equipment collection
+router.get('/equipment-summary', paymentController.getEquipmentPaymentSummary);
+
 // Get pending payments
 router.get('/pending', paymentController.getPendingPayments);
 

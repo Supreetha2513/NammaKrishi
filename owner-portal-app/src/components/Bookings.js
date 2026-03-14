@@ -16,7 +16,13 @@ function Bookings() {
   const [actionLoading, setActionLoading] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [ownerUpiId, setOwnerUpiId] = useState('');
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole');
@@ -44,18 +50,37 @@ function Bookings() {
     );
 
     // Set up real-time listener with onSnapshot
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       console.log(`📊 Real-time update: Found ${snapshot.size} equipment request(s)`);
 
       // Extract ALL fields from each document and convert Timestamps
-      const requests = snapshot.docs.map(docSnap => {
+      const requests = await Promise.all(snapshot.docs.map(async (docSnap) => {
         const data = docSnap.data();
         
         // Convert Firestore Timestamps to JavaScript Dates
         const startDate = data.start_date?.toDate ? data.start_date.toDate() : data.start_date;
         const endDate = data.end_date?.toDate ? data.end_date.toDate() : data.end_date;
         const createdAt = data.created_at?.toDate ? data.created_at.toDate() : data.created_at;
-        
+
+        // Fetch price_per_day from equipment collection to calculate total amount
+        let pricePerDay = 0;
+        let calculatedTotal = null;
+        if (data.equipment_id) {
+          try {
+            const equipSnap = await getDoc(doc(db, 'equipment', data.equipment_id));
+            if (equipSnap.exists()) {
+              pricePerDay = equipSnap.data().price_per_day || 0;
+            }
+          } catch (err) {
+            console.log('Could not fetch equipment price:', err.message);
+          }
+        }
+        if (pricePerDay > 0 && startDate && endDate) {
+          const msPerDay = 1000 * 60 * 60 * 24;
+          const numDays = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / msPerDay));
+          calculatedTotal = numDays * pricePerDay;
+        }
+
         console.log('📄 Request:', {
           id: docSnap.id,
           customer_name: data.customer_name,
@@ -70,9 +95,11 @@ function Bookings() {
           ...data,
           start_date: startDate,
           end_date: endDate,
-          created_at: createdAt
+          created_at: createdAt,
+          price_per_day: pricePerDay,
+          calculated_total: calculatedTotal
         };
-      });
+      }));
 
       setBookings(requests);
       setLoading(false);
@@ -125,28 +152,36 @@ function Bookings() {
       const booking = bookings.find(b => b.id === bookingId);
       
       if (!booking) {
-        alert('Booking not found');
+        showToast('Booking not found.', 'error');
         setActionLoading(false);
         return;
       }
 
-      // Check if required payment details exist
-      if (!booking.total_price) {
-        alert('❌ Payment details missing. Cannot accept booking without total price.');
-        setActionLoading(false);
-        return;
+      // Fetch equipment to get price_per_day
+      let pricePerDay = 0;
+      if (booking.equipment_id) {
+        const equipSnap = await getDoc(doc(db, 'equipment', booking.equipment_id));
+        if (equipSnap.exists()) {
+          pricePerDay = equipSnap.data().price_per_day || 0;
+        }
       }
 
-      // Generate payment ID and transaction ID
+      // Calculate number of days from start_date and end_date
+      const startDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date);
+      const endDate = booking.end_date instanceof Date ? booking.end_date : new Date(booking.end_date);
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const numDays = Math.max(1, Math.round((endDate - startDate) / msPerDay));
+
+      // Calculate amount: days × price_per_day
+      const calculatedAmount = numDays * pricePerDay;
+
       const now = new Date();
-      const yearMonth = now.toISOString().slice(0, 7).replace('-', '');
-      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      const paymentId = `PAY_${yearMonth}_${randomNum}`;
-      const upiTransactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-      // Create payment document
+      // Create payment document with payment_id null and status incomplete
       const paymentData = {
-        amount: booking.total_price,
+        amount: calculatedAmount,
+        num_days: numDays,
+        price_per_day: pricePerDay,
         booking_id: booking.id,
         created_at: Timestamp.now(),
         customer_id: booking.customer_id || '',
@@ -154,24 +189,24 @@ function Bookings() {
         equipment_id: booking.equipment_id || '',
         equipment_name: booking.equipment_name || '',
         owner_id: booking.owner_id || '',
-        payment_id: paymentId,
+        payment_id: null,
         payment_method: 'UPI',
         payment_screenshot_url: null,
-        payment_status: 'completed',
-        upi_transaction_id: upiTransactionId,
-        verified_at: Timestamp.now(),
+        payment_status: 'incomplete',
+        upi_transaction_id: null,
+        verified_at: false,
         owner_upi_id: ownerUpiId || ''
       };
 
       // Add payment to Firestore
       const paymentDocRef = await addDoc(collection(db, 'payments'), paymentData);
       console.log('✅ Payment created:', paymentDocRef.id);
-      
+
       // Update booking_status in equipment_requests to "accepted"
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
         booking_status: 'accepted',
-        payment_id: paymentId,
+        payment_id: null,
         accepted_at: Timestamp.now()
       });
       console.log('✅ Booking status updated to accepted');
@@ -186,9 +221,12 @@ function Bookings() {
         location: booking.location || '',
         start_date: booking.start_date,
         end_date: booking.end_date,
+        num_days: numDays,
+        price_per_day: pricePerDay,
+        total_price: calculatedAmount,
         booking_status: 'accepted',
-        payment_status: 'completed',
-        payment_id: paymentId,
+        payment_status: 'incomplete',
+        payment_id: null,
         created_at: Timestamp.now()
       });
       console.log('✅ Booking record created');
@@ -197,14 +235,13 @@ function Bookings() {
       setPaymentDetails({
         ...paymentData,
         id: paymentDocRef.id,
-        created_at: now,
-        verified_at: now
+        created_at: now
       });
 
-      alert('✅ Booking accepted successfully! Payment recorded.');
+      showToast('Booking accepted! Payment recorded.', 'success');
     } catch (error) {
       console.error('Error accepting booking:', error);
-      alert('Failed to accept booking: ' + error.message);
+      showToast('Failed to accept booking: ' + error.message, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -221,20 +258,18 @@ function Bookings() {
         rejected_at: Timestamp.now()
       });
 
-      alert('❌ Booking rejected');
+      showToast('Booking rejected.', 'info');
       setShowModal(false);
       setRejectionReason('');
     } catch (error) {
       console.error('Error rejecting booking:', error);
-      alert('Failed to reject booking: ' + error.message);
+      showToast('Failed to reject booking: ' + error.message, 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleCompleteBooking = async (bookingId) => {
-    if (!window.confirm('Mark this booking as completed?')) return;
-    
     setActionLoading(true);
     try {
       const requestRef = doc(db, 'equipment_requests', bookingId);
@@ -243,10 +278,10 @@ function Bookings() {
         completed_at: Timestamp.now()
       });
 
-      alert('🎉 Booking marked as completed!');
+      showToast('Booking marked as completed!', 'success');
     } catch (error) {
       console.error('Error completing booking:', error);
-      alert('Failed to complete booking');
+      showToast('Failed to complete booking.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -457,7 +492,13 @@ function Bookings() {
                       </div>
                       <div className="detail-row">
                         <span className="label">💰 Total:</span>
-                        <span className="value price">₹{booking.total_price?.toLocaleString() || 'N/A'}</span>
+                        <span className="value price">
+                          {booking.calculated_total != null
+                            ? `₹${booking.calculated_total.toLocaleString()}`
+                            : booking.total_price != null
+                            ? `₹${booking.total_price.toLocaleString()}`
+                            : 'N/A'}
+                        </span>
                       </div>
                     </div>
 
@@ -535,7 +576,7 @@ function Bookings() {
                 <p><strong>Start Date:</strong> {formatDate(selectedBooking.start_date)}</p>
                 <p><strong>End Date:</strong> {formatDate(selectedBooking.end_date)}</p>
                 <p><strong>Duration:</strong> {calculateDuration(selectedBooking.start_date, selectedBooking.end_date)}</p>
-                <p><strong>Total Price:</strong> ₹{selectedBooking.total_price?.toLocaleString() || 'N/A'}</p>
+                <p><strong>Total Price:</strong> ₹{(selectedBooking.calculated_total ?? selectedBooking.total_price)?.toLocaleString() || 'N/A'}</p>
               </div>
 
               <div className="modal-section">
@@ -619,6 +660,17 @@ function Bookings() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          <span className="toast-icon">
+            {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+          </span>
+          <span className="toast-message">{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}>×</button>
         </div>
       )}
     </div>

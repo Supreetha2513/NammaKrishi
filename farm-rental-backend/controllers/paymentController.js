@@ -6,7 +6,7 @@ const paymentController = {
   getOwnerPayments: async (req, res) => {
     try {
       const ownerId = req.user.uid;
-      const { status, limit = 50 } = req.query;
+      const { status, verified, limit = 50 } = req.query;
 
       // Get all payments for this owner
       let paymentsQuery = db.collection('payments')
@@ -14,6 +14,10 @@ const paymentController = {
 
       if (status) {
         paymentsQuery = paymentsQuery.where('payment_status', '==', status);
+      }
+
+      if (verified === 'true') {
+        paymentsQuery = paymentsQuery.where('verified_at', '==', true);
       }
 
       const paymentsSnapshot = await paymentsQuery.limit(parseInt(limit)).get();
@@ -88,10 +92,10 @@ const paymentController = {
         return res.status(403).json({ error: 'Not authorized' });
       }
 
-      // Update payment status
+      // Update payment status and mark as verified
       await db.collection('payments').doc(id).update({
         payment_status: 'completed',
-        verified_at: admin.firestore.FieldValue.serverTimestamp(),
+        verified_at: true,
         verified_by: ownerId
       });
 
@@ -119,21 +123,23 @@ const paymentController = {
     }
   },
 
-  // Get pending payments (awaiting verification)
+  // Get pending payments (awaiting verification) — verified_at is false or null
   getPendingPayments: async (req, res) => {
     try {
       const ownerId = req.user.uid;
 
-      const paymentsSnapshot = await db.collection('payments')
+      // Fetch all owner payments that are NOT yet verified (verified_at is false or null)
+      const allPaymentsSnapshot = await db.collection('payments')
         .where('owner_id', '==', ownerId)
-        .where('payment_status', '==', 'pending_verification')
         .get();
 
-      const payments = paymentsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString()
-      }));
+      const payments = allPaymentsSnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          created_at: doc.data().created_at?.toDate?.()?.toISOString()
+        }))
+        .filter(p => p.verified_at !== true && p.amount != null);
 
       res.json({
         success: true,
@@ -142,6 +148,65 @@ const paymentController = {
       });
     } catch (error) {
       console.error('Get pending payments error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Get equipment-level payment summary from equipment collection
+  getEquipmentPaymentSummary: async (req, res) => {
+    try {
+      const ownerId = req.user.uid;
+
+      // Fetch all equipment for this owner from the equipment collection
+      const equipmentSnapshot = await db.collection('equipment')
+        .where('owner_id', '==', ownerId)
+        .get();
+
+      const summary = [];
+
+      for (const equipDoc of equipmentSnapshot.docs) {
+        const equip = equipDoc.data();
+
+        // Get all bookings for this equipment
+        let totalRevenue = 0;
+        let paidCount = 0;
+        let pendingCount = 0;
+
+        try {
+          const bookingsSnapshot = await db.collection('bookings')
+            .where('equipment_id', '==', equipDoc.id)
+            .get();
+
+          bookingsSnapshot.docs.forEach(bDoc => {
+            const b = bDoc.data();
+            const amount = b.total_price || 0;
+            if (b.payment_status === 'paid') {
+              totalRevenue += amount;
+              paidCount++;
+            } else if (b.payment_status === 'unpaid' && b.booking_status !== 'cancelled') {
+              pendingCount++;
+            }
+          });
+        } catch (err) {
+          console.log('Bookings fetch error for equipment', equipDoc.id, err.message);
+        }
+
+        summary.push({
+          equipment_id: equipDoc.id,
+          name: equip.name,
+          category: equip.category,
+          price_per_hour: equip.price_per_hour,
+          price_per_day: equip.price_per_day,
+          availability_status: equip.availability_status,
+          total_revenue: totalRevenue,
+          paid_bookings: paidCount,
+          pending_payments: pendingCount
+        });
+      }
+
+      res.json({ success: true, equipment_summary: summary });
+    } catch (error) {
+      console.error('Get equipment payment summary error:', error);
       res.status(500).json({ error: error.message });
     }
   },

@@ -14,7 +14,14 @@ function Payment() {
   const [paymentStats, setPaymentStats] = useState(null);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
+  const [equipmentSummary, setEquipmentSummary] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   useEffect(() => {
     fetchUserProfile();
@@ -45,9 +52,13 @@ function Payment() {
       const pendingResponse = await api.get('/payments/pending');
       setPendingPayments(pendingResponse.data.payments || []);
 
-      // Fetch recent payments (completed)
-      const paymentsResponse = await api.get('/payments?status=completed&limit=10');
+      // Fetch recent payments (verified_at === true)
+      const paymentsResponse = await api.get('/payments?verified=true&limit=10');
       setRecentPayments(paymentsResponse.data.payments || []);
+
+      // Fetch equipment-level payment summary from equipment collection
+      const equipmentResponse = await api.get('/payments/equipment-summary');
+      setEquipmentSummary(equipmentResponse.data.equipment_summary || []);
 
     } catch (error) {
       console.error('Error fetching payment data:', error);
@@ -67,26 +78,22 @@ function Payment() {
       setUpiId(newUpiId);
       setEditingUpi(false);
       setNewUpiId('');
-      alert('UPI ID updated successfully!');
+      showToast('UPI ID updated successfully!');
     } catch (error) {
       console.error('Error updating UPI:', error);
-      alert('Failed to update UPI ID');
+      showToast('Failed to update UPI ID', 'error');
     }
   };
 
   const handleVerifyPayment = async (paymentId) => {
-    if (!window.confirm('Confirm that you have received this payment?')) {
-      return;
-    }
-
     try {
       setRefreshing(true);
       await api.patch(`/payments/${paymentId}/verify`);
-      await fetchPaymentData(); // Refresh data
-      alert('Payment verified successfully!');
+      await fetchPaymentData();
+      showToast('Payment verified successfully!');
     } catch (error) {
       console.error('Error verifying payment:', error);
-      alert('Failed to verify payment');
+      showToast('Failed to verify payment', 'error');
     } finally {
       setRefreshing(false);
     }
@@ -227,11 +234,13 @@ function Payment() {
         )}
 
         {/* Pending Payments (Require Verification) */}
-        {pendingPayments.length > 0 && (
-          <div className="payment-section">
-            <h2>🔔 Pending Verification ({pendingPayments.length})</h2>
-            <div className="payments-list">
-              {pendingPayments.map((payment) => (
+        <div className="payment-section">
+          <h2>🔔 Pending Verification ({pendingPayments.filter(p => p.verified_at !== true && p.amount).length})</h2>
+          <div className="payments-list">
+            {pendingPayments.filter(p => p.verified_at !== true && p.amount).length > 0 ? (
+              pendingPayments
+                .filter(p => p.verified_at !== true && p.amount)
+                .map((payment) => (
                 <div key={payment.id} className="payment-card pending">
                   <div className="payment-info">
                     <div className="payment-header">
@@ -254,7 +263,44 @@ function Payment() {
                     ✓ Verify Payment
                   </button>
                 </div>
-              ))}
+              ))
+            ) : (
+              <div className="no-data"><p>No pending payments to verify</p></div>
+            )}
+          </div>
+        </div>
+
+        {/* Equipment Payment Summary */}
+        {equipmentSummary.length > 0 && (
+          <div className="payment-section">
+            <h2>🚜 Equipment Payment Details</h2>
+            <div className="transactions-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Equipment</th>
+                    <th>Category</th>
+                    <th>Price/Hour</th>
+                    <th>Price/Day</th>
+                    <th>Paid Bookings</th>
+                    <th>Pending</th>
+                    <th>Total Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipmentSummary.map((item) => (
+                    <tr key={item.equipment_id}>
+                      <td>{item.name}</td>
+                      <td>{item.category}</td>
+                      <td>{formatCurrency(item.price_per_hour)}</td>
+                      <td>{formatCurrency(item.price_per_day)}</td>
+                      <td>{item.paid_bookings}</td>
+                      <td>{item.pending_payments}</td>
+                      <td className="amount">{formatCurrency(item.total_revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -296,6 +342,14 @@ function Payment() {
           )}
         </div>
       </div>
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          <span className="toast-icon">{toast.type === 'success' ? '✅' : '❌'}</span>
+          <span className="toast-message">{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}>×</button>
+        </div>
+      )}
     </div>
   );
 }
