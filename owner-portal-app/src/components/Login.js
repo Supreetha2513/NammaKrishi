@@ -41,9 +41,9 @@ function Login() {
       
       setTimeout(() => {
         if (role === 'owner') {
- navigate('/dashboard');
+          navigate('/dashboard');
         } else {
-          navigate('/customer-dashboard');
+          window.location.href = 'https://trumusefinal-production.up.railway.app/';
         }
       }, 1500);
     } catch (error) {
@@ -70,7 +70,7 @@ function Login() {
         if (data.user.role === 'owner') {
           navigate('/dashboard');
         } else {
-          navigate('/customer-dashboard');
+          window.location.href = 'https://trumusefinal-production.up.railway.app/';
         }
       }, 1500);
     } catch (error) {
