@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, updateDoc, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import Sidebar from './Sidebar';
 import './Bookings.css';
@@ -26,11 +26,67 @@ function Bookings() {
     }
 
     fetchOwnerDetails();
-    fetchBookings();
-    // Poll for updates every 5 seconds
-    const interval = setInterval(fetchBookings, 5000);
     
-    return () => clearInterval(interval);
+    // Set up real-time listener for bookings
+    const ownerId = localStorage.getItem('userId');
+    if (!ownerId) {
+      console.error('❌ Owner ID not found in localStorage');
+      setLoading(false);
+      return;
+    }
+
+    console.log('🔍 Setting up real-time listener for owner:', ownerId);
+
+    // Query equipment_requests collection where owner_id matches current owner
+    const q = query(
+      collection(db, 'equipment_requests'),
+      where('owner_id', '==', ownerId)
+    );
+
+    // Set up real-time listener with onSnapshot
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log(`📊 Real-time update: Found ${snapshot.size} equipment request(s)`);
+
+      // Extract ALL fields from each document and convert Timestamps
+      const requests = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        
+        // Convert Firestore Timestamps to JavaScript Dates
+        const startDate = data.start_date?.toDate ? data.start_date.toDate() : data.start_date;
+        const endDate = data.end_date?.toDate ? data.end_date.toDate() : data.end_date;
+        const createdAt = data.created_at?.toDate ? data.created_at.toDate() : data.created_at;
+        
+        console.log('📄 Request:', {
+          id: docSnap.id,
+          customer_name: data.customer_name,
+          equipment_name: data.equipment_name,
+          booking_status: data.booking_status,
+          start_date: startDate,
+          end_date: endDate
+        });
+        
+        return {
+          id: docSnap.id,
+          ...data,
+          start_date: startDate,
+          end_date: endDate,
+          created_at: createdAt
+        };
+      });
+
+      setBookings(requests);
+      setLoading(false);
+      
+      if (requests.length === 0) {
+        console.log('💡 No equipment requests found for this owner');
+      }
+    }, (error) => {
+      console.error('❌ Error in real-time listener:', error);
+      setLoading(false);
+    });
+    
+    // Cleanup listener on unmount
+    return () => unsubscribe();
   }, [navigate]);
 
   // Fetch owner's UPI ID from owners collection
@@ -49,71 +105,17 @@ function Bookings() {
     }
   };
 
-  // Fetch bookings directly from Firestore
-  const fetchBookings = async () => {
-    try {
-      const ownerId = localStorage.getItem('userId'); // Get logged-in owner's Firebase UID
-      
-      if (!ownerId) {
-        console.error('❌ Owner ID not found in localStorage');
-        console.log('💡 Please make sure you are logged in as an owner');
-        setLoading(false);
-        return;
-      }
-
-      console.log('🔍 Fetching equipment requests for owner:', ownerId);
-
-      // Query equipment_requests collection where owner_id matches current owner
-      const q = query(
-        collection(db, 'equipment_requests'),
-        where('owner_id', '==', ownerId)
-      );
-
-      const snapshot = await getDocs(q);
-      
-      console.log(`📊 Found ${snapshot.size} equipment request(s)`);
-
-      // Extract ALL fields from each document
-      const requests = snapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log('📄 Request:', {
-          id: doc.id,
-          customer_name: data.customer_name,
-          equipment_name: data.equipment_name,
-          status: data.request_status,
-          ...data
-        });
-        return {
-          id: doc.id,
-          ...data
-        };
-      });
-
-      setBookings(requests);
-      setFilteredBookings(requests);
-      setLoading(false);
-      
-      if (requests.length === 0) {
-        console.log('💡 No equipment requests found for this owner');
-        console.log('💡 Make sure customer portal is creating requests with owner_id:', ownerId);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching bookings:', error);
-      console.error('Error details:', error.message);
-      setLoading(false);
-    }
-  };
-
+  // Filter bookings based on selected status
   useEffect(() => {
     if (statusFilter === 'all') {
       setFilteredBookings(bookings);
     } else if (statusFilter === 'pending') {
       // Show both 'pending' and 'open' status when filtering by pending
       setFilteredBookings(bookings.filter(b => 
-        b.request_status === 'pending' || b.request_status === 'open'
+        b.booking_status === 'pending' || b.booking_status === 'open'
       ));
     } else {
-      setFilteredBookings(bookings.filter(b => b.request_status === statusFilter));
+      setFilteredBookings(bookings.filter(b => b.booking_status === statusFilter));
     }
   }, [statusFilter, bookings]);
 
@@ -124,6 +126,7 @@ function Bookings() {
       
       if (!booking) {
         alert('Booking not found');
+        setActionLoading(false);
         return;
       }
 
@@ -162,13 +165,16 @@ function Bookings() {
 
       // Add payment to Firestore
       const paymentDocRef = await addDoc(collection(db, 'payments'), paymentData);
+      console.log('✅ Payment created:', paymentDocRef.id);
       
-      // Update request_status in equipment_requests to "accepted"
+      // Update booking_status in equipment_requests to "accepted"
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
-        request_status: 'accepted',
-        payment_id: paymentId
+        booking_status: 'accepted',
+        payment_id: paymentId,
+        accepted_at: Timestamp.now()
       });
+      console.log('✅ Booking status updated to accepted');
 
       // Create a new document in the bookings collection
       await addDoc(collection(db, 'bookings'), {
@@ -185,6 +191,7 @@ function Bookings() {
         payment_id: paymentId,
         created_at: Timestamp.now()
       });
+      console.log('✅ Booking record created');
 
       // Set payment details to display in modal
       setPaymentDetails({
@@ -195,7 +202,6 @@ function Bookings() {
       });
 
       alert('✅ Booking accepted successfully! Payment recorded.');
-      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error accepting booking:', error);
       alert('Failed to accept booking: ' + error.message);
@@ -207,17 +213,17 @@ function Bookings() {
   const handleRejectBooking = async (bookingId) => {
     setActionLoading(true);
     try {
-      // Update request_status in equipment_requests to "rejected"
+      // Update booking_status in equipment_requests to "rejected"
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
-        request_status: 'rejected',
-        rejection_reason: rejectionReason || 'Not specified'
+        booking_status: 'rejected',
+        rejection_reason: rejectionReason || 'Not specified',
+        rejected_at: Timestamp.now()
       });
 
       alert('❌ Booking rejected');
       setShowModal(false);
       setRejectionReason('');
-      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error rejecting booking:', error);
       alert('Failed to reject booking: ' + error.message);
@@ -233,11 +239,11 @@ function Bookings() {
     try {
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
-        request_status: 'completed'
+        booking_status: 'completed',
+        completed_at: Timestamp.now()
       });
 
       alert('🎉 Booking marked as completed!');
-      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error completing booking:', error);
       alert('Failed to complete booking');
@@ -263,10 +269,21 @@ function Bookings() {
     return badges[status] || { class: '', text: status };
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-IN', { 
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    
+    // Handle Firestore Timestamp
+    if (date.toDate && typeof date.toDate === 'function') {
+      date = date.toDate();
+    }
+    
+    // Handle Date object or date string
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    // Check if valid date
+    if (isNaN(dateObj.getTime())) return 'N/A';
+    
+    return dateObj.toLocaleDateString('en-IN', { 
       day: 'numeric', 
       month: 'short', 
       year: 'numeric' 
@@ -275,17 +292,25 @@ function Bookings() {
 
   const calculateDuration = (start, end) => {
     if (!start || !end) return '0 days';
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    
+    // Convert Firestore Timestamps if needed
+    const startDate = start instanceof Date ? start : (start.toDate ? start.toDate() : new Date(start));
+    const endDate = end instanceof Date ? end : (end.toDate ? end.toDate() : new Date(end));
+    
+    // Check if valid dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return '0 days';
+    
     const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     return `${days} day${days !== 1 ? 's' : ''}`;
   };
 
+  // Calculate dynamic stats based on booking_status
   const stats = {
     total: bookings.length,
-    pending: bookings.filter(b => b.request_status === 'pending' || b.request_status === 'open').length,
-    accepted: bookings.filter(b => b.request_status === 'accepted').length,
-    completed: bookings.filter(b => b.request_status === 'completed').length
+    pending: bookings.filter(b => b.booking_status === 'pending' || b.booking_status === 'open').length,
+    accepted: bookings.filter(b => b.booking_status === 'accepted').length,
+    completed: bookings.filter(b => b.booking_status === 'completed').length,
+    rejected: bookings.filter(b => b.booking_status === 'rejected').length
   };
 
   if (loading) {
@@ -373,7 +398,7 @@ function Bookings() {
               className={statusFilter === 'rejected' ? 'active' : ''} 
               onClick={() => setStatusFilter('rejected')}
             >
-              Rejected
+              Rejected ({stats.rejected})
             </button>
           </div>
 
@@ -394,7 +419,7 @@ function Bookings() {
                 {filteredBookings.map(booking => (
                   <div 
                     key={booking.id} 
-                    className={`booking-card ${booking.request_status}`}
+                    className={`booking-card ${booking.booking_status}`}
                     onClick={() => openBookingModal(booking)}
                   >
                     <div className="booking-card-header">
@@ -402,8 +427,8 @@ function Bookings() {
                         <h3>{booking.equipment_name || 'Equipment'}</h3>
                         <p className="equipment-type">📍 {booking.location || 'N/A'}</p>
                       </div>
-                      <span className={`status-badge ${getStatusBadge(booking.request_status).class}`}>
-                        {getStatusBadge(booking.request_status).text}
+                      <span className={`status-badge ${getStatusBadge(booking.booking_status).class}`}>
+                        {getStatusBadge(booking.booking_status).text}
                       </span>
                     </div>
 
@@ -436,7 +461,7 @@ function Bookings() {
                       </div>
                     </div>
 
-                    {(booking.request_status === 'pending' || booking.request_status === 'open') && (
+                    {(booking.booking_status === 'pending' || booking.booking_status === 'open') && (
                       <div className="booking-actions">
                         <button 
                           className="btn-accept"
@@ -460,7 +485,7 @@ function Bookings() {
                       </div>
                     )}
 
-                    {booking.request_status === 'accepted' && (
+                    {booking.booking_status === 'accepted' && (
                       <div className="booking-actions">
                         <button 
                           className="btn-complete"
@@ -517,11 +542,11 @@ function Bookings() {
                 <h3>ℹ️ Request Information</h3>
                 <p><strong>Request ID:</strong> {selectedBooking.id || 'N/A'}</p>
                 <p><strong>Owner ID:</strong> {selectedBooking.owner_id || 'N/A'}</p>
-                <p><strong>Status:</strong> <span className={`status-badge ${getStatusBadge(selectedBooking.request_status).class}`}>
-                  {getStatusBadge(selectedBooking.request_status).text}
+                <p><strong>Status:</strong> <span className={`status-badge ${getStatusBadge(selectedBooking.booking_status).class}`}>
+                  {getStatusBadge(selectedBooking.booking_status).text}
                 </span></p>
                 {selectedBooking.created_at && (
-                  <p><strong>Created:</strong> {formatDate(selectedBooking.created_at.toDate ? selectedBooking.created_at.toDate() : selectedBooking.created_at)}</p>
+                  <p><strong>Created:</strong> {formatDate(selectedBooking.created_at)}</p>
                 )}
                 {selectedBooking.rejection_reason && (
                   <p><strong>Rejection Reason:</strong> {selectedBooking.rejection_reason}</p>
@@ -548,7 +573,7 @@ function Bookings() {
                 </div>
               )}
 
-              {(selectedBooking.request_status === 'pending' || selectedBooking.request_status === 'open') && (
+              {(selectedBooking.booking_status === 'pending' || selectedBooking.booking_status === 'open') && (
                 <div className="modal-section">
                   <h3>Reject Booking</h3>
                   <textarea
@@ -562,7 +587,7 @@ function Bookings() {
             </div>
 
             <div className="modal-footer">
-              {(selectedBooking.request_status === 'pending' || selectedBooking.request_status === 'open') && (
+              {(selectedBooking.booking_status === 'pending' || selectedBooking.booking_status === 'open') && (
                 <>
                   <button 
                     className="btn-accept-large"
@@ -580,7 +605,7 @@ function Bookings() {
                   </button>
                 </>
               )}
-              {selectedBooking.status === 'accepted' && (
+              {selectedBooking.booking_status === 'accepted' && (
                 <button 
                   className="btn-complete-large"
                   onClick={() => handleCompleteBooking(selectedBooking.id)}
