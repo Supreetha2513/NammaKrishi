@@ -52,6 +52,12 @@ const Navbar = () => {
               >
                 Cost Calculator
               </button>
+              <button
+                className={`nav-link`}
+                onClick={() => window.open('https://lungcancer-cn-4.onrender.com', '_blank', 'noopener,noreferrer')}
+              >
+                ConnectX
+              </button>
             </>
           )}
         </div>
