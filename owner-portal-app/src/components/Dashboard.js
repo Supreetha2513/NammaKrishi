@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 import api from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Sidebar from './Sidebar';
 import './Dashboard.css';
 
 function Dashboard() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    equipmentCount: 0,
+    activeBookings: 0,
+    totalEarnings: 0,
+    monthlyEarnings: 0
+  });
   const [recentBookings, setRecentBookings] = useState([]);
   const [monthlyRevenue, setMonthlyRevenue] = useState([]);
   const [insights, setInsights] = useState([]);
@@ -31,6 +38,74 @@ function Dashboard() {
     }
 
     fetchDashboardData();
+    
+    // Set up real-time listener for payments
+    const ownerId = localStorage.getItem('userId');
+    if (ownerId) {
+      console.log('🔄 Setting up real-time payments listener for owner:', ownerId);
+      
+      const paymentsQuery = query(
+        collection(db, 'payments'),
+        where('owner_id', '==', ownerId)
+      );
+
+      const unsubscribe = onSnapshot(paymentsQuery, (snapshot) => {
+        console.log(`💰 Payments update: ${snapshot.size} payments found`);
+        
+        const payments = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
+
+        console.log('📊 Payments data:', payments);
+
+        // Calculate total earnings
+        const totalEarnings = payments.reduce((sum, payment) => {
+          const amount = Number(payment.amount) || 0;
+          console.log(`Adding payment: ${payment.id}, amount: ${amount}`);
+          return sum + amount;
+        }, 0);
+
+        // Calculate monthly earnings (current month)
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        const monthlyEarnings = payments.reduce((sum, payment) => {
+          const paymentDate = payment.created_at?.toDate ? payment.created_at.toDate() : new Date(payment.created_at);
+          if (paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear) {
+            const amount = Number(payment.amount) || 0;
+            return sum + amount;
+          }
+          return sum;
+        }, 0);
+
+        console.log('✅ Calculated earnings - Total:', totalEarnings, 'Monthly:', monthlyEarnings);
+
+        // Update stats with real-time earnings
+        setStats(prev => ({
+          ...prev,
+          totalEarnings,
+          monthlyEarnings
+        }));
+
+        // Calculate payment stats
+        const completedPayments = payments.filter(p => p.payment_status === 'completed');
+        const pendingPayments = payments.filter(p => p.payment_status === 'pending');
+        
+        setPaymentStats({
+          total_received: completedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+          completed_count: completedPayments.length,
+          total_pending: pendingPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+          pending_count: pendingPayments.length
+        });
+      });
+
+      return () => unsubscribe();
+    }
   }, [navigate, location]); // Refresh when location changes (user navigates back)
 
   // Auto-refresh when window regains focus
@@ -77,7 +152,14 @@ function Dashboard() {
       ]);
 
       if (dashboardRes.data.success) {
-        setStats(dashboardRes.data.stats);
+        setStats(prev => ({
+          ...prev,
+          equipmentCount: dashboardRes.data.stats?.equipmentCount || 0,
+          activeBookings: dashboardRes.data.stats?.activeBookings || 0,
+          // Keep earnings from real-time listener
+          totalEarnings: prev.totalEarnings,
+          monthlyEarnings: prev.monthlyEarnings
+        }));
         setRecentBookings(dashboardRes.data.recentBookings || []);
         setMonthlyRevenue(dashboardRes.data.monthlyRevenue || []);
       }

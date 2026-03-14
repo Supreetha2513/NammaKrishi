@@ -2,9 +2,10 @@
 .filter-bar {
   display: flex;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
   align-items: center;
+  padding: 0 8px;
 }
 
 .search-box {
@@ -34,8 +35,9 @@
 .view-tabs {
   display: flex;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   border-bottom: 2px solid #e0e0e0;
+  padding: 0 8px;
 }
 
 .tab-btn {
@@ -63,7 +65,8 @@
 .equipment-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 24px;
+  gap: 20px;
+  padding: 0 8px;
 }
 
 .equipment-card {
@@ -115,7 +118,7 @@
 }
 
 .equipment-info {
-  padding: 20px;
+  padding: 16px;
 }
 
 .equipment-header {
