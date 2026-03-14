@@ -366,7 +366,7 @@ Easy to extend with:
 
 ## 📚 What You Get
 
-This complete application includes everything needed for a professional farm equipment rental marketplace:
+This complete application includes everything needed for a professional NammaKrishi marketplace:
 
 1. **Complete Frontend Application** - All pages, components, and features
 2. **Backend Services** - Firebase integration and Cloud Functions
@@ -389,7 +389,7 @@ This complete application includes everything needed for a professional farm equ
 
 ---
 
-**Congratulations! You have a production-ready Farm Equipment Rental Marketplace!** 🎊
+**Congratulations! You have a production-ready NammaKrishi Marketplace!** 🎊
 
 For questions, refer to the documentation files included in the project.
 

@@ -41,7 +41,7 @@ const LoginPage = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1>🌾 Farm Equipment Rental</h1>
+          <h1>🌾 NammaKrishi</h1>
           <p>Sign in to manage your equipment rentals</p>
         </div>
 

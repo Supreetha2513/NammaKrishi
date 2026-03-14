@@ -1,4 +1,4 @@
-# Quick Start Guide - Farm Equipment Rental Marketplace
+# Quick Start Guide - NammaKrishi Marketplace
 
 ## ⚡ 5-Minute Setup
 
@@ -377,7 +377,7 @@ firebase deploy --only functions
 
 ## 🎉 You're All Set!
 
-Your Farm Equipment Rental Marketplace is ready to use. Start the server and explore all the features!
+Your NammaKrishi Marketplace is ready to use. Start the server and explore all the features!
 
 ```bash
 npm start

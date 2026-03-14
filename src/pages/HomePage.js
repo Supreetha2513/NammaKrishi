@@ -153,7 +153,7 @@ const HomePage = () => {
   if (!user) {
     return (
       <div className="auth-prompt">
-        <h1>Farm Equipment Rental</h1>
+        <h1>NammaKrishi</h1>
         <p>Please sign in to search and rent equipment</p>
         <button onClick={() => navigate('/login')}>
           Sign In
@@ -167,7 +167,7 @@ const HomePage = () => {
 
       <div className="home-header">
         <div className="header-content">
-          <h1>Farm Equipment Rental Marketplace</h1>
+          <h1>NammaKrishi Marketplace</h1>
           <p>Search and rent agricultural machinery easily</p>
 
           <div className="quick-actions">

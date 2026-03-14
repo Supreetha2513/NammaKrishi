@@ -50,7 +50,7 @@ const SignupPage = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1>🌾 Farm Equipment Rental</h1>
+          <h1>🌾 NammaKrishi</h1>
           <p>Create your account and start renting equipment</p>
         </div>
 
@@ -158,7 +158,7 @@ const SignupPage = () => {
 
       <div className="auth-side">
         <div className="side-content">
-          <h2>Why Farm Equipment Rental?</h2>
+          <h2>Why NammaKrishi?</h2>
           <ul>
             <li>✓ Affordable equipment rental</li>
             <li>✓ Wide range of machinery</li>

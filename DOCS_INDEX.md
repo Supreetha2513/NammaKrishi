@@ -1,6 +1,6 @@
 # 📚 Documentation Index
 
-**Welcome to the Farm Equipment Rental Marketplace!**
+**Welcome to the NammaKrishi Marketplace!**
 
 This document helps you navigate through all the project documentation and understand what each file contains.
 

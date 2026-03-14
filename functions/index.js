@@ -1,19 +1,12 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const cors = require('cors');
-const Razorpay = require('razorpay');
 const axios = require('axios');
 const crypto = require('crypto');
 
 admin.initializeApp();
 
 const corsHandler = cors({ origin: true });
-
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
 
 // Create Razorpay Order
 exports.createRazorpayOrder = functions.https.onRequest((req, res) => {
@@ -158,7 +151,7 @@ exports.notifyEquipmentAvailable = functions.firestore
           .firestore()
           .collection('equipment_requests')
           .where('equipment_name', '==', afterData.name)
-          .where('request_status', '==', 'pending')
+          .where('booking_status', '==', 'pending')
           .get();
 
         for (const doc of requestsSnapshot.docs) {
@@ -177,7 +170,7 @@ exports.notifyEquipmentAvailable = functions.firestore
 
             // Update request status
             await doc.ref.update({
-              request_status: 'notified',
+              booking_status: 'notified',
               notified_at: admin.firestore.Timestamp.now(),
             });
           }

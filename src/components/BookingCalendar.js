@@ -2,10 +2,17 @@ import React, { useState } from 'react';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import './BookingCalendar.css';
 
-const BookingCalendar = ({ onSelectDates, minDate = new Date() }) => {
+const BookingCalendar = ({ onSelectDates, minDate = new Date(), blockedDates = [] }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+
+  const isDateBlocked = (day) => {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    return blockedDates.some(
+      (blockedDate) => new Date(blockedDate).toDateString() === date.toDateString()
+    );
+  };
 
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -103,7 +110,7 @@ const BookingCalendar = ({ onSelectDates, minDate = new Date() }) => {
               key={index}
               className={`calendar-day ${inRange ? 'in-range' : ''} ${selected ? 'selected' : ''}`}
               onClick={() => day && isValidDate && handleDateClick(day)}
-              disabled={!day || !isValidDate}
+              disabled={!day || !isValidDate || isDateBlocked(day)}
             >
               {day}
             </button>

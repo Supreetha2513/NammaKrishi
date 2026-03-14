@@ -1,4 +1,4 @@
-# Farm Equipment Rental - Development Standards
+# NammaKrishi - Development Standards
 
 ## Code Style
 

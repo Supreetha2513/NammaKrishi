@@ -1,4 +1,4 @@
-# Farm Equipment Rental Marketplace - Complete Project Structure
+# NammaKrishi Marketplace - Complete Project Structure
 
 ## 📁 File Organization
 
@@ -267,7 +267,7 @@ d:\skit_hackathon\skit_web/
 │   ├── customer_id: string
 │   ├── equipment_name: string
 │   ├── location: string
-│   ├── request_status: string
+│   ├── booking_status: string
 │   └── created_at: timestamp
 ```
 
@@ -349,6 +349,6 @@ d:\skit_hackathon\skit_web/
 
 ---
 
-This complete project structure provides everything needed for a production-ready Farm Equipment Rental Marketplace!
+This complete project structure provides everything needed for a production-ready NammaKrishi Marketplace!
 
 🌾 **Happy farming!**

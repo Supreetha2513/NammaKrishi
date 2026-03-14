@@ -29,7 +29,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-brand" onClick={() => navigate('/')}>
-          🌾 Farm Rentals
+          🌾 NammaKrishi
         </div>
 
         <div className={`navbar-menu ${menuOpen ? 'active' : ''}`}>

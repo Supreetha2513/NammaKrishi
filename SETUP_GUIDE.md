@@ -1,4 +1,4 @@
-# Setup Guide for Farm Equipment Rental Marketplace
+# Setup Guide for NammaKrishi Marketplace
 
 ## 1. Firebase Project Setup
 

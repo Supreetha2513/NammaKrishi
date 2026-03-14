@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import BookingCalendar from '../components/BookingCalendar';
-import RazorpayPaymentModal from '../components/RazorpayPaymentModal';
 import BookingService from '../services/bookingService';
 import { useAuth } from '../hooks/useAuth';
 import { calculateTotalPrice, formatCurrency, formatDate } from '../utils/helpers';
@@ -23,6 +22,38 @@ const EquipmentDetailsPage = () => {
   const [loading, setLoading] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
   const [error, setError] = useState(null);
+  const [upiId, setUpiId] = useState(null); // State to store UPI ID
+  const [blockedDates, setBlockedDates] = useState([]); // State to store blocked dates
+
+  const fetchOwnerUpiId = async (ownerId) => {
+    try {
+      const ownerDoc = await EquipmentService.getOwnerDetails(ownerId);
+      return ownerDoc.upi_id || 'UPI ID not available';
+    } catch (error) {
+      console.error('Failed to fetch owner UPI ID:', error);
+      return 'Error fetching UPI ID';
+    }
+  };
+
+  const fetchBlockedDates = async () => {
+    try {
+      const bookings = await BookingService.getBookingsByEquipmentId(equipment.id);
+      const ranges = bookings.map((booking) => {
+        const start = booking.start_date.toDate ? booking.start_date.toDate() : new Date(booking.start_date);
+        const end = booking.end_date.toDate ? booking.end_date.toDate() : new Date(booking.end_date);
+        return { start, end };
+      });
+      setBlockedDates(ranges);
+    } catch (error) {
+      console.error('Failed to fetch blocked dates:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (equipment) {
+      fetchBlockedDates();
+    }
+  }, [equipment?.id]);
 
   if (!equipment) {
     return (
@@ -54,9 +85,14 @@ const EquipmentDetailsPage = () => {
 
     setLoading(true);
     try {
+      // Fetch owner's UPI ID
+      const upi = await fetchOwnerUpiId(equipment.owner_id);
+      setUpiId(upi);
+
       const bookingData = {
         equipment_id: equipment.id,
         customer_id: user.uid,
+        customer_name: user.displayName || user.email || 'Unknown User',
         start_date: startDate,
         end_date: endDate,
         total_price: totalPrice,
@@ -66,27 +102,10 @@ const EquipmentDetailsPage = () => {
 
       const booking = await BookingService.createBooking(bookingData);
 
-      // Create Razorpay order
-      const orderResponse = await BookingService.createRazorpayOrder({
-        booking_id: booking.id,
-        amount: totalPrice,
-        currency: 'INR',
-        equipment_name: equipment.name,
-      });
-
-      setOrderDetails({
-        orderId: orderResponse.order_id,
-        amount: totalPrice,
-        currency: 'INR',
-        equipmentName: equipment.name,
-        days: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)),
-        customerName: user.displayName || 'Customer',
-        customerEmail: user.email,
-        customerPhone: user.phone || '',
-        description: `Booking for ${equipment.name}`,
-      });
-
-      setShowPaymentModal(true);
+      toast.success('Booking created successfully!');
+      setTimeout(() => {
+        navigate('/my-bookings');
+      }, 2000);
     } catch (error) {
       toast.error('Failed to create booking: ' + error.message);
     } finally {
@@ -134,6 +153,41 @@ const EquipmentDetailsPage = () => {
       toast.success('You will be notified when this equipment becomes available.');
     } catch (error) {
       toast.error('Failed to add notification request: ' + error.message);
+    }
+  };
+
+  const handleRequestItem = async () => {
+    if (!equipment || !user) {
+      toast.error('Equipment or user not found');
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      toast.error('Please select rental dates before making a request');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const request = {
+        equipment_id: equipment.id,
+        customer_id: user.uid,
+        customer_name: user.displayName || user.email || 'Unknown User',
+        start_date: startDate,
+        end_date: endDate,
+        phone_number: user.phone || '',
+        location: equipment.location,
+      };
+
+      await EquipmentService.requestItem(request);
+      toast.success('Request has been made successfully!');
+      setTimeout(() => {
+        navigate('/my-bookings');
+      }, 2000);
+    } catch (error) {
+      toast.error('Failed to make request: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -212,12 +266,21 @@ const EquipmentDetailsPage = () => {
             </div>
           )}
 
+          {upiId && (
+            <div className="upi-id">
+              <p>Owner's UPI ID: <strong>{upiId}</strong></p>
+            </div>
+          )}
+
           <button
             className="book-btn"
-            onClick={handleBooking}
+            onClick={() => {
+              handleRequestItem();
+              toast.success('Request has been made successfully!');
+            }}
             disabled={loading || equipment.availability_status !== 'available'}
           >
-            {loading ? 'Processing...' : 'Book Now'}
+            {loading ? 'Processing...' : 'Request Item'}
           </button>
 
           {equipment.availability_status === 'unavailable' && (
@@ -232,16 +295,9 @@ const EquipmentDetailsPage = () => {
         <BookingCalendar
           onSelectDates={handleDatesSelected}
           minDate={new Date()}
+          blockedDates={blockedDates}
         />
       </div>
-
-      <RazorpayPaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        orderDetails={orderDetails}
-        onPaymentSuccess={handlePaymentSuccess}
-        onPaymentError={handlePaymentError}
-      />
     </div>
   );
 };

@@ -1,22 +1,101 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import BookingService from '../services/bookingService';
-import EquipmentService from '../services/equipmentService';
-import equipmentRequestService from '../services/equipmentRequestService';
-import { useAuth } from '../hooks/useAuth';
-import { formatCurrency, formatDate, getBookingStatus, getPaymentStatus } from '../utils/helpers';
-import { FiArrowLeft, FiX, FiBell } from 'react-icons/fi';
-import './MyBookingsPage.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import BookingService from "../services/bookingService";
+import EquipmentService from "../services/equipmentService";
+import equipmentRequestService from "../services/equipmentRequestService";
+import { useAuth } from "../hooks/useAuth";
+import {
+  formatCurrency,
+  formatDate,
+  getBookingStatus,
+  getPaymentStatus,
+} from "../utils/helpers";
+import { FiArrowLeft, FiX, FiBell } from "react-icons/fi";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Timestamp } from "firebase/firestore";
+import { storage } from "../services/firebase";
+import "./MyBookingsPage.css";
+
+const PaymentCard = ({ payment, onPaymentSubmit }) => {
+  const [transactionId, setTransactionId] = useState("");
+  const [screenshotFile, setScreenshotFile] = useState(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (!transactionId || !screenshotFile) {
+      alert("Please provide transaction ID and screenshot");
+      return;
+    }
+
+    onPaymentSubmit(payment.id, transactionId, screenshotFile);
+  };
+
+  return (
+    <div className="payment-card">
+      <div className="payment-header">
+        <h4>{payment.equipment_name}</h4>
+        <span className="status-badge" style={{ backgroundColor: "#f59e0b" }}>
+          Payment Pending
+        </span>
+      </div>
+
+      <div className="payment-details">
+        <p>
+          <strong>Owner ID:</strong> {payment.owner_id}
+        </p>
+
+        <p>
+          <strong>Dates:</strong>{" "}
+          {formatDate(payment.start_date)} to {formatDate(payment.end_date)}
+        </p>
+
+        <p>
+          <strong>Total Price:</strong> {formatCurrency(payment.total_price)}
+        </p>
+
+        {payment.upi_id && (
+          <p>
+            <strong>Owner UPI:</strong> {payment.upi_id}
+          </p>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="payment-form">
+        <input
+          type="text"
+          placeholder="Enter UPI Transaction ID"
+          value={transactionId}
+          onChange={(e) => setTransactionId(e.target.value)}
+          required
+        />
+
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setScreenshotFile(e.target.files[0])}
+          required
+        />
+
+        <button type="submit">Submit Payment</button>
+      </form>
+    </div>
+  );
+};
 
 const MyBookingsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [bookings, setBookings] = useState([]);
-  const [equipmentMap, setEquipmentMap] = useState({});
-  const [requests, setRequests] = useState([]);
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('bookings');
-  const [equipmentNotAvailableName, setEquipmentNotAvailableName] = useState('');
+  const [bookings, setBookings] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [equipmentMap, setEquipmentMap] = useState({});
+  const [activeTab, setActiveTab] = useState("bookings");
+
+  const [equipmentNotAvailableName, setEquipmentNotAvailableName] =
+    useState("");
   const [showOfflineAlert, setShowOfflineAlert] = useState(false);
 
   useEffect(() => {
@@ -29,27 +108,41 @@ const MyBookingsPage = () => {
     try {
       setLoading(true);
 
-      // Fetch bookings
-      const bookingsData = await BookingService.getBookingsByCustomerId(user.uid);
+      const bookingsData =
+        await BookingService.getBookingsByCustomerId(user.uid);
+
       setBookings(bookingsData);
 
-      // Fetch equipment details for all bookings
       const equipMap = {};
+
       for (const booking of bookingsData) {
         if (!equipMap[booking.equipment_id]) {
-          const equip = await EquipmentService.getEquipmentById(booking.equipment_id);
+          const equip = await EquipmentService.getEquipmentById(
+            booking.equipment_id
+          );
+
           if (equip) {
             equipMap[booking.equipment_id] = equip;
           }
         }
       }
+
       setEquipmentMap(equipMap);
 
-      // Fetch equipment requests
-      const requestsData = await equipmentRequestService.getRequestsByCustomerId(user.uid);
+      const requestsData =
+        await equipmentRequestService.getRequestsByCustomerId(user.uid);
+
       setRequests(requestsData);
+
+      const paymentsData =
+        await BookingService.getBookingsByCustomerIdAndPaymentStatus(
+          user.uid,
+          "awaiting_payment"
+        );
+
+      setPayments(paymentsData);
     } catch (error) {
-      console.error('Error fetching bookings:', error);
+      console.error("Error fetching bookings:", error);
     } finally {
       setLoading(false);
     }
@@ -59,7 +152,7 @@ const MyBookingsPage = () => {
     e.preventDefault();
 
     if (!equipmentNotAvailableName.trim()) {
-      alert('Please enter equipment name');
+      alert("Please enter equipment name");
       return;
     }
 
@@ -67,17 +160,58 @@ const MyBookingsPage = () => {
       await equipmentRequestService.createEquipmentRequest({
         customer_id: user.uid,
         equipment_name: equipmentNotAvailableName,
-        location: user.userData?.location || '',
-        request_status: 'pending',
+        location: user.userData?.location || "",
+        booking_status: "pending",
       });
 
-      alert('Request created! You will be notified when this equipment is available.');
-      setEquipmentNotAvailableName('');
+      alert("Request created successfully");
+
+      setEquipmentNotAvailableName("");
       setShowOfflineAlert(false);
+
       fetchData();
     } catch (error) {
-      console.error('Error creating request:', error);
-      alert('Failed to create request');
+      console.error("Error creating request:", error);
+      alert("Failed to create request");
+    }
+  };
+
+  const handlePaymentSubmit = async (paymentId, transactionId, screenshot) => {
+    try {
+      const storageRef = ref(
+        storage,
+        `payment_screenshots/${paymentId}_${Date.now()}`
+      );
+
+      await uploadBytes(storageRef, screenshot);
+
+      const screenshotUrl = await getDownloadURL(storageRef);
+
+      await BookingService.updatePayment(paymentId, {
+        upi_transaction_id: transactionId,
+        payment_screenshot_url: screenshotUrl,
+        payment_status: "submitted",
+      });
+
+      await BookingService.updateBookingPaymentStatus(paymentId, "submitted");
+
+      const payment = payments.find((p) => p.id === paymentId);
+
+      await BookingService.createNotification({
+        type: "payment_submitted",
+        booking_id: paymentId,
+        owner_id: payment.owner_id,
+        customer_id: user.uid,
+        message: "Customer submitted payment proof",
+        created_at: Timestamp.now(),
+      });
+
+      alert("Payment submitted successfully");
+
+      fetchData();
+    } catch (error) {
+      console.error("Payment submission error:", error);
+      alert("Failed to submit payment");
     }
   };
 
@@ -85,22 +219,22 @@ const MyBookingsPage = () => {
     return (
       <div className="auth-prompt">
         <h1>My Bookings</h1>
-        <p>Please sign in to view your bookings</p>
-        <button onClick={() => navigate('/login')}>Sign In</button>
+        <p>Please sign in to view bookings</p>
+        <button onClick={() => navigate("/login")}>Sign In</button>
       </div>
     );
   }
 
   return (
     <div className="my-bookings-page">
-      <button className="back-btn" onClick={() => navigate('/')}>
+      <button className="back-btn" onClick={() => navigate("/")}>
         <FiArrowLeft size={24} />
         Back
       </button>
 
       <div className="page-header">
         <h1>My Bookings</h1>
-        <p>Manage your equipment rentals</p>
+        <p>Manage your rentals</p>
 
         <button
           className="offline-alert-btn"
@@ -114,19 +248,23 @@ const MyBookingsPage = () => {
       {showOfflineAlert && (
         <div className="offline-alert-form">
           <div className="form-header">
-            <h3>Request Equipment When Available</h3>
-            <button className="close-btn" onClick={() => setShowOfflineAlert(false)}>
-              <FiX size={20} />
+            <h3>Request Equipment</h3>
+            <button onClick={() => setShowOfflineAlert(false)}>
+              <FiX />
             </button>
           </div>
+
           <form onSubmit={handleCreateOfflineRequest}>
             <input
               type="text"
               value={equipmentNotAvailableName}
-              onChange={(e) => setEquipmentNotAvailableName(e.target.value)}
-              placeholder="Enter equipment name (e.g., Tractor, Harvester)"
+              onChange={(e) =>
+                setEquipmentNotAvailableName(e.target.value)
+              }
+              placeholder="Enter equipment name"
               required
             />
+
             <button type="submit">Request Alert</button>
           </form>
         </div>
@@ -134,137 +272,122 @@ const MyBookingsPage = () => {
 
       <div className="tabs">
         <button
-          className={`tab ${activeTab === 'bookings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('bookings')}
+          className={activeTab === "bookings" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("bookings")}
         >
           Active Bookings ({bookings.length})
         </button>
+
         <button
-          className={`tab ${activeTab === 'requests' ? 'active' : ''}`}
-          onClick={() => setActiveTab('requests')}
+          className={activeTab === "requests" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("requests")}
         >
           Equipment Requests ({requests.length})
+        </button>
+
+        <button
+          className={activeTab === "payments" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("payments")}
+        >
+          Payments ({payments.length})
         </button>
       </div>
 
       <div className="tab-content">
-        {activeTab === 'bookings' && (
-          <div className="bookings-section">
+        {activeTab === "bookings" && (
+          <div>
             {loading ? (
-              <div className="loading">Loading bookings...</div>
+              <div className="loading">Loading...</div>
             ) : bookings.length === 0 ? (
-              <div className="no-data">
-                <p>No bookings yet</p>
-                <button onClick={() => navigate('/')}>Search Equipment</button>
-              </div>
+              <div className="no-data">No bookings</div>
             ) : (
-              <div className="bookings-list">
-                {bookings.map((booking) => {
-                  const equipment = equipmentMap[booking.equipment_id];
-                  const bookingStatus = getBookingStatus(booking.booking_status);
-                  const paymentStatus = getPaymentStatus(booking.payment_status);
+              bookings.map((booking) => {
+                const equipment = equipmentMap[booking.equipment_id];
+                const bookingStatus = getBookingStatus(
+                  booking.booking_status
+                );
+                const paymentStatus = getPaymentStatus(
+                  booking.payment_status
+                );
 
-                  return (
-                    <div key={booking.id} className="booking-card">
-                      <div className="booking-header">
-                        <h3>{equipment?.name || 'Equipment'}</h3>
-                        <span
-                          className="status-badge"
-                          style={{ backgroundColor: bookingStatus.color }}
-                        >
-                          {bookingStatus.label}
-                        </span>
-                      </div>
+                return (
+                  <div key={booking.id} className="booking-card">
+                    <h3>{equipment?.name}</h3>
 
-                      <div className="booking-details">
-                        <div className="detail-item">
-                          <span className="label">Dates:</span>
-                          <span className="value">
-                            {formatDate(booking.start_date)} to {formatDate(booking.end_date)}
-                          </span>
-                        </div>
+                    <p>
+                      {formatDate(booking.start_date)} -{" "}
+                      {formatDate(booking.end_date)}
+                    </p>
 
-                        <div className="detail-item">
-                          <span className="label">Location:</span>
-                          <span className="value">{equipment?.location}</span>
-                        </div>
+                    <p>{equipment?.location}</p>
 
-                        <div className="detail-item">
-                          <span className="label">Total Price:</span>
-                          <span className="value">
-                            {formatCurrency(booking.total_price)}
-                          </span>
-                        </div>
+                    <p>{formatCurrency(booking.total_price)}</p>
 
-                        <div className="detail-item">
-                          <span className="label">Payment Status:</span>
-                          <span
-                            className="status-badge payment"
-                            style={{ backgroundColor: paymentStatus.color }}
-                          >
-                            {paymentStatus.label}
-                          </span>
-                        </div>
-                      </div>
+                    <span
+                      className="status-badge"
+                      style={{ backgroundColor: bookingStatus.color }}
+                    >
+                      {bookingStatus.label}
+                    </span>
 
-                      {equipment?.description && (
-                        <div className="equipment-description">
-                          <p>{equipment.description}</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    <span
+                      className="status-badge"
+                      style={{ backgroundColor: paymentStatus.color }}
+                    >
+                      {paymentStatus.label}
+                    </span>
+                  </div>
+                );
+              })
             )}
           </div>
         )}
 
-        {activeTab === 'requests' && (
-          <div className="requests-section">
+        {activeTab === "requests" && (
+          <div>
             {loading ? (
-              <div className="loading">Loading requests...</div>
+              <div className="loading">Loading...</div>
             ) : requests.length === 0 ? (
-              <div className="no-data">
-                <p>No equipment requests yet</p>
-                <button onClick={() => setShowOfflineAlert(true)}>Create Request</button>
-              </div>
+              <div className="no-data">No requests</div>
             ) : (
-              <div className="requests-list">
-                {requests.map((request) => {
-                  const statusColors = {
-                    pending: '#f59e0b',
-                    notified: '#3b82f6',
-                    fulfilled: '#10b981',
-                  };
+              requests.map((request) => (
+                <div key={request.id} className="request-card">
+                  <h4>{request.equipment_name}</h4>
 
-                  return (
-                    <div key={request.id} className="request-card">
-                      <div className="request-header">
-                        <h4>{request.equipment_name}</h4>
-                        <span
-                          className="status-badge"
-                          style={{ backgroundColor: statusColors[request.request_status] }}
-                        >
-                          {request.request_status}
-                        </span>
-                      </div>
+                  {request.start_date && (
+                    <p>
+                      {formatDate(request.start_date)} -{" "}
+                      {formatDate(request.end_date)}
+                    </p>
+                  )}
 
-                      <div className="request-details">
-                        <p>
-                          <strong>Location:</strong> {request.location}
-                        </p>
-                        <p>
-                          <strong>Requested on:</strong> {formatDate(request.created_at)}
-                        </p>
-                        <p className="info-text">
-                          You will receive a notification when this equipment becomes available.
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                  <p>{request.location}</p>
+
+                  <p>{formatDate(request.created_at)}</p>
+
+                  <span className="status-badge">
+                    {request.status || request.booking_status}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "payments" && (
+          <div>
+            {loading ? (
+              <div className="loading">Loading...</div>
+            ) : payments.length === 0 ? (
+              <div className="no-data">No pending payments</div>
+            ) : (
+              payments.map((payment) => (
+                <PaymentCard
+                  key={payment.id}
+                  payment={payment}
+                  onPaymentSubmit={handlePaymentSubmit}
+                />
+              ))
             )}
           </div>
         )}

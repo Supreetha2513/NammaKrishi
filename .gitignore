@@ -29,3 +29,6 @@ yarn-error.log*
 # Firebase
 .firebase/
 .firebaserc
+
+./venv
+/venv

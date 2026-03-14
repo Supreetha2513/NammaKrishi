@@ -1,7 +1,7 @@
 {
   "name": "farm-equipment-rental",
   "version": "1.0.0",
-  "description": "Farm Equipment Rental Marketplace - Customer Dashboard",
+  "description": "NammaKrishi Marketplace - Customer Dashboard",
   "private": true,
   "dependencies": {
     "axios": "^1.6.0",

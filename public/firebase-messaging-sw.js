@@ -17,7 +17,7 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('Received background message:', payload);
   
-  const notificationTitle = payload.notification.title || 'Farm Equipment Rental';
+  const notificationTitle = payload.notification.title || 'NammaKrishi';
   const notificationOptions = {
     body: payload.notification.body || 'You have a new notification',
     icon: '🌾',

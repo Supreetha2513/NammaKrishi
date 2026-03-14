@@ -33,7 +33,7 @@ const RazorpayPaymentModal = ({ isOpen, onClose, orderDetails, onPaymentSuccess,
       key: process.env.REACT_APP_RAZORPAY_KEY_ID,
       amount: Math.round(orderDetails.amount * 100), // Convert to paise
       currency: orderDetails.currency || 'INR',
-      name: 'Farm Equipment Rental',
+      name: 'NammaKrishi',
       description: orderDetails.description,
       order_id: orderDetails.orderId,
       prefill: {

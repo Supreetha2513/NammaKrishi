@@ -1,4 +1,4 @@
-# Farm Equipment Rental Marketplace
+# NammaKrishi Marketplace
 
 A comprehensive web application for farmers to search, book, and pay for agricultural machinery rentals with multi-language support, secure payments, and SMS notifications.
 
@@ -82,7 +82,7 @@ equipment_requests/
 ├── customer_id
 ├── equipment_name
 ├── location
-├── request_status
+├── booking_status
 └── created_at
 ```
 

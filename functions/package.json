@@ -1,6 +1,6 @@
 {
   "name": "firebase-functions",
-  "description": "Cloud Functions for Farm Equipment Rental",
+  "description": "Cloud Functions for NammaKrishi",
   "version": "1.0.0",
   "private": true,
   "engines": {
