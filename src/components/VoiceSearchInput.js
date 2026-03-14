@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FiMic, FiX } from 'react-icons/fi';
 import VoiceSearchService from '../utils/voiceSearchUtils';
 import EquipmentService from '../services/equipmentService';
@@ -8,6 +8,7 @@ const VoiceSearchInput = ({ onSearch, onCategoryChange, language = 'en' }) => {
   const [isListening, setIsListening] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState(null);
+  const searchTimeoutRef = useRef(null);
 
   const handleVoiceSearch = () => {
     if (!VoiceSearchService.isSupported()) {
@@ -111,14 +112,37 @@ const VoiceSearchInput = ({ onSearch, onCategoryChange, language = 'en' }) => {
   const handleTextSearch = async (e) => {
     const value = e.target.value;
     setSearchText(value);
-    try {
-      const results = await EquipmentService.searchEquipment({ search: value });
-      if (onSearch) {
-        onSearch(results);
-      }
-    } catch (searchError) {
-      setError(`Search failed: ${searchError.message}`);
+    setError(null);
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
+
+    // Only search if there's meaningful text (at least 2 characters)
+    if (value.length < 2) {
+      if (onSearch) {
+        onSearch([]);
+      }
+      return;
+    }
+
+    // Debounce the search - wait 500ms before searching
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await EquipmentService.searchEquipment({ search: value });
+        if (onSearch) {
+          onSearch(results);
+        }
+      } catch (searchError) {
+        // Don't show index errors to user - they'll be resolved automatically
+        if (searchError.message.includes('index')) {
+          console.warn('Firebase index not ready yet. Please try again in a moment.');
+          return;
+        }
+        setError(`Search failed: ${searchError.message}`);
+      }
+    }, 500); // Wait 500ms after user stops typing
   };
 
   const handleClear = () => {

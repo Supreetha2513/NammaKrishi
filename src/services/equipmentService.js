@@ -136,7 +136,7 @@ class EquipmentService {
       const bookingsQuery = query(
         collection(db, "bookings"),
         where("equipment_id", "==", equipment.id),
-        where("booking_date", ">=", thirtyDaysAgo)
+        where("created_at", ">=", thirtyDaysAgo)
       );
 
       const bookingsSnapshot = await getDocs(bookingsQuery);
