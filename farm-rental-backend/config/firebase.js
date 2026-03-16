@@ -20,5 +20,3 @@ const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
 module.exports = { admin, db, bucket };
-
-console.log(process.env.FIREBASE_SERVICE_ACCOUNT);
