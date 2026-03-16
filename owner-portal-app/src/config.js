@@ -9,4 +9,4 @@ export const firebaseConfig = {
 };
 
 // Backend API URL
-export const API_URL = 'http://localhost:5000/api';
+export const API_URL = 'https://nammakrishi-backend.onrender.com/api';
