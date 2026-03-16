@@ -1,8 +1,14 @@
 // config/firebase.js
+require("dotenv").config();
 const admin = require("firebase-admin");
 
-// Load service account credentials for nammakrishi-b0612 Firebase project
-const serviceAccount = require("./serviceAccountKey.json");
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  serviceAccount = require("./serviceAccountKey.json");
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -14,3 +20,5 @@ const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
 module.exports = { admin, db, bucket };
+
+console.log(process.env.FIREBASE_SERVICE_ACCOUNT);
