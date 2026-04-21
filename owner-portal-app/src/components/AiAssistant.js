@@ -201,7 +201,6 @@ function AiAssistant() {
 
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [parsedData, setParsedData] = useState({
     name: '',
@@ -272,16 +271,16 @@ function AiAssistant() {
   }, []);
 
   const finalizeVoiceRecording = () => {
-    const finalText = (voiceTranscript || transcriptRef.current || '').trim();
+    const finalText = (transcriptRef.current || '').trim();
     if (!finalText) {
       setFormHint('No audio captured. Try speaking clearly and press Stop when done.');
       setIsListening(false);
       return;
     }
 
-    setFormHint('Filling the form now...');
-    handleSend(finalText);
-    setVoiceTranscript('');
+    // Populate input field with captured text
+    setInput(finalText);
+    setFormHint('✅ Voice captured! Review the text and press Send to fill the form.');
     transcriptRef.current = '';
     setIsListening(false);
   };
@@ -298,35 +297,49 @@ function AiAssistant() {
 
         if (result.isFinal) {
           transcriptRef.current += transcript + ' ';
-
         } else {
           interimTranscript += transcript;
         }
       }
-
-      const combined = `${transcriptRef.current.trim()} ${interimTranscript.trim()}`.trim();
-      setVoiceTranscript(combined);
     };
 
     const handleError = (event) => {
-      console.error('SpeechRecognition error:', event.error, event);
-      // Don't show error for 'aborted' as it's expected when stopping
-      if (event.error !== 'aborted') {
-        setFormHint(`Microphone error: ${event.error}. Please check permissions or try again.`);
+      console.error('SpeechRecognition error:', event.error);
+
+      if (event.error === 'no-speech') {
+        // Show user-friendly message and offer to retry
+        setFormHint('No speech detected. Please try speaking clearly, then press Stop.');
+        return;
       }
+
+      if (event.error === 'network') {
+        setFormHint('Network error. Please check your internet connection and try again.');
+        setIsListening(false);
+        return;
+      }
+
+      if (event.error !== 'aborted') {
+        setFormHint(`Microphone error: ${event.error}. Please try again.`);
+      }
+
       setIsListening(false);
     };
 
     const handleStart = () => {
-      setFormHint('Recording... speak now, then press Stop to fill the form.');
+      setFormHint('🎤 Recording started... Speak clearly and press Stop when done.');
     };
 
     const handleEnd = () => {
-      const hasTranscript = transcriptRef.current.trim().length > 0 || voiceTranscript.trim().length > 0;
+      // If user manually stopped, finalize the recording
+      if (!isListening) return;
+
+      const hasTranscript = transcriptRef.current.trim().length > 0;
+
       if (hasTranscript) {
         finalizeVoiceRecording();
       } else {
-        setFormHint('Recording stopped. No audio detected; try speaking more clearly.');
+        // No transcript captured - show hint to retry
+        setFormHint('No speech detected. Please try again by pressing the microphone button.');
         setIsListening(false);
       }
     };
@@ -445,7 +458,6 @@ function AiAssistant() {
       // Stop recording
       try {
         recognition.stop();
-
       } catch (err) {
         console.error('Error stopping recognition:', err);
       }
@@ -473,9 +485,8 @@ function AiAssistant() {
 
       // Reset transcript and start recording
       transcriptRef.current = '';
-      setVoiceTranscript('');
       setError(null);
-      setFormHint('Recording... speak now, then press Stop to fill the form.');
+      setFormHint('🎤 Recording... Speak clearly. Press Stop when done.');
       setIsListening(true);
 
       try {
@@ -565,13 +576,7 @@ function AiAssistant() {
 
           {isListening && (
             <div className="voice-status">
-              🎙️ Recording... speak clearly. (Stop to finalize)
-            </div>
-          )}
-
-          {!isListening && voiceTranscript && (
-            <div className="voice-status">
-              📌 Captured: {voiceTranscript}
+              � Recording... speak clearly. Press Stop when done.
             </div>
           )}
 

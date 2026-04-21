@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, onSnapshot, updateDoc, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, updateDoc, addDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import Sidebar from './Sidebar';
 import './Bookings.css';
@@ -15,14 +15,8 @@ function Bookings() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
-  const [ownerUpiId, setOwnerUpiId] = useState('');
-  const [toast, setToast] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const navigate = useNavigate();
-
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole');
@@ -31,118 +25,78 @@ function Bookings() {
       return;
     }
 
-    fetchOwnerDetails();
+    fetchBookings();
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchBookings, 5000);
     
-    // Set up real-time listener for bookings
-    const ownerId = localStorage.getItem('userId');
-    if (!ownerId) {
-      console.error('❌ Owner ID not found in localStorage');
-      setLoading(false);
-      return;
-    }
+    return () => clearInterval(interval);
+  }, [navigate]);
 
-    console.log('🔍 Setting up real-time listener for owner:', ownerId);
+  // Fetch bookings directly from Firestore
+  const fetchBookings = async () => {
+    try {
+      const ownerId = localStorage.getItem('userId'); // Get logged-in owner's Firebase UID
+      
+      if (!ownerId) {
+        console.error('❌ Owner ID not found in localStorage');
+        console.log('💡 Please make sure you are logged in as an owner');
+        setLoading(false);
+        return;
+      }
 
-    // Query equipment_requests collection where owner_id matches current owner
-    const q = query(
-      collection(db, 'equipment_requests'),
-      where('owner_id', '==', ownerId)
-    );
+      console.log('🔍 Fetching equipment requests for owner:', ownerId);
 
-    // Set up real-time listener with onSnapshot
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      console.log(`📊 Real-time update: Found ${snapshot.size} equipment request(s)`);
+      // Query equipment_requests collection where owner_id matches current owner
+      const q = query(
+        collection(db, 'equipment_requests'),
+        where('owner_id', '==', ownerId)
+      );
 
-      // Extract ALL fields from each document and convert Timestamps
-      const requests = await Promise.all(snapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        
-        // Convert Firestore Timestamps to JavaScript Dates
-        const startDate = data.start_date?.toDate ? data.start_date.toDate() : data.start_date;
-        const endDate = data.end_date?.toDate ? data.end_date.toDate() : data.end_date;
-        const createdAt = data.created_at?.toDate ? data.created_at.toDate() : data.created_at;
+      const snapshot = await getDocs(q);
+      
+      console.log(`📊 Found ${snapshot.size} equipment request(s)`);
 
-        // Fetch price_per_day from equipment collection to calculate total amount
-        let pricePerDay = 0;
-        let calculatedTotal = null;
-        if (data.equipment_id) {
-          try {
-            const equipSnap = await getDoc(doc(db, 'equipment', data.equipment_id));
-            if (equipSnap.exists()) {
-              pricePerDay = equipSnap.data().price_per_day || 0;
-            }
-          } catch (err) {
-            console.log('Could not fetch equipment price:', err.message);
-          }
-        }
-        if (pricePerDay > 0 && startDate && endDate) {
-          const msPerDay = 1000 * 60 * 60 * 24;
-          const numDays = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / msPerDay));
-          calculatedTotal = numDays * pricePerDay;
-        }
-
+      // Extract ALL fields from each document
+      const requests = snapshot.docs.map(doc => {
+        const data = doc.data();
         console.log('📄 Request:', {
-          id: docSnap.id,
+          id: doc.id,
           customer_name: data.customer_name,
           equipment_name: data.equipment_name,
-          booking_status: data.booking_status,
-          start_date: startDate,
-          end_date: endDate
+          status: data.request_status,
+          ...data
         });
-        
         return {
-          id: docSnap.id,
-          ...data,
-          start_date: startDate,
-          end_date: endDate,
-          created_at: createdAt,
-          price_per_day: pricePerDay,
-          calculated_total: calculatedTotal
+          id: doc.id,
+          ...data
         };
-      }));
+      });
 
       setBookings(requests);
+      setFilteredBookings(requests);
       setLoading(false);
       
       if (requests.length === 0) {
         console.log('💡 No equipment requests found for this owner');
-      }
-    }, (error) => {
-      console.error('❌ Error in real-time listener:', error);
-      setLoading(false);
-    });
-    
-    // Cleanup listener on unmount
-    return () => unsubscribe();
-  }, [navigate]);
-
-  // Fetch owner's UPI ID from owners collection
-  const fetchOwnerDetails = async () => {
-    try {
-      const ownerId = localStorage.getItem('userId');
-      if (!ownerId) return;
-
-      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
-      if (ownerDoc.exists()) {
-        const ownerData = ownerDoc.data();
-        setOwnerUpiId(ownerData.upi_id || '');
+        console.log('💡 Make sure customer portal is creating requests with owner_id:', ownerId);
       }
     } catch (error) {
-      console.error('Error fetching owner details:', error);
+      console.error('❌ Error fetching bookings:', error);
+      console.error('Error details:', error.message);
+      setLoading(false);
     }
   };
 
-  // Filter bookings based on selected status
   useEffect(() => {
     if (statusFilter === 'all') {
       setFilteredBookings(bookings);
     } else if (statusFilter === 'pending') {
       // Show both 'pending' and 'open' status when filtering by pending
       setFilteredBookings(bookings.filter(b => 
-        b.booking_status === 'pending' || b.booking_status === 'open'
+        b.request_status === 'pending' || b.request_status === 'open'
       ));
     } else {
-      setFilteredBookings(bookings.filter(b => b.booking_status === statusFilter));
+      setFilteredBookings(bookings.filter(b => b.request_status === statusFilter));
     }
   }, [statusFilter, bookings]);
 
@@ -152,136 +106,158 @@ function Bookings() {
       const booking = bookings.find(b => b.id === bookingId);
       
       if (!booking) {
-        showToast('Booking not found.', 'error');
+        alert('Booking not found');
         setActionLoading(false);
         return;
       }
 
-      // Fetch equipment to get price_per_day
-      let pricePerDay = 0;
+      const ownerId = localStorage.getItem('userId');
+
+      // 1. Fetch owner details to get UPI info
+      console.log('🔍 Fetching owner details...');
+      const ownerDoc = await getDoc(doc(db, 'owners', ownerId));
+      
+      if (!ownerDoc.exists()) {
+        alert('Owner details not found');
+        setActionLoading(false);
+        return;
+      }
+
+      const ownerData = ownerDoc.data();
+      const ownerUpiId = ownerData.upi_id || ownerData.upiId || 'Not provided';
+
+      // 2. Fetch equipment details from equipment collection
+      console.log('🔍 Fetching equipment details...');
+      let equipmentData = null;
       if (booking.equipment_id) {
-        const equipSnap = await getDoc(doc(db, 'equipment', booking.equipment_id));
-        if (equipSnap.exists()) {
-          pricePerDay = equipSnap.data().price_per_day || 0;
+        const equipmentDoc = await getDoc(doc(db, 'equipment', booking.equipment_id));
+        if (equipmentDoc.exists()) {
+          equipmentData = equipmentDoc.data();
         }
       }
 
-      // Calculate number of days from start_date and end_date
-      const startDate = booking.start_date instanceof Date ? booking.start_date : new Date(booking.start_date);
-      const endDate = booking.end_date instanceof Date ? booking.end_date : new Date(booking.end_date);
-      const msPerDay = 1000 * 60 * 60 * 24;
-      const numDays = Math.max(1, Math.round((endDate - startDate) / msPerDay));
+      // 3. Generate unique IDs
+      const timestamp = Date.now();
+      const dateStr = new Date().toISOString().slice(0, 7).replace('-', '');
+      const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      
+      const bookingIdGenerated = `BKG_${dateStr}_${randomNum}`;
+      const paymentId = `PAY_${dateStr}_${randomNum}`;
+      const upiTransactionId = `TXN${timestamp}${Math.floor(Math.random() * 1000)}`;
 
-      // Calculate amount: days × price_per_day
-      const calculatedAmount = numDays * pricePerDay;
+      // 4. Calculate amount (use total_price from booking)
+      const amount = booking.total_price || 0;
 
-      const now = new Date();
-
-      // Create payment document with payment_id null and status incomplete
+      // 5. Create payment document
+      console.log('💳 Creating payment document...');
       const paymentData = {
-        amount: calculatedAmount,
-        num_days: numDays,
-        price_per_day: pricePerDay,
-        booking_id: booking.id,
-        created_at: Timestamp.now(),
-        customer_id: booking.customer_id || '',
-        customer_name: booking.customer_name || '',
-        equipment_id: booking.equipment_id || '',
-        equipment_name: booking.equipment_name || '',
-        owner_id: booking.owner_id || '',
-        payment_id: null,
+        payment_id: paymentId,
+        booking_id: bookingIdGenerated,
+        customer_id: booking.customer_id || 'N/A',
+        customer_name: booking.customer_name || 'N/A',
+        equipment_id: booking.equipment_id || 'N/A',
+        equipment_name: equipmentData?.name || booking.equipment_name || 'N/A',
+        owner_id: ownerId,
+        amount: amount,
         payment_method: 'UPI',
+        payment_status: 'completed',
+        upi_transaction_id: upiTransactionId,
         payment_screenshot_url: null,
-        payment_status: 'incomplete',
-        upi_transaction_id: null,
-        verified_at: false,
-        owner_upi_id: ownerUpiId || ''
+        created_at: Timestamp.now(),
+        verified_at: Timestamp.now()
       };
 
-      // Add payment to Firestore
-      const paymentDocRef = await addDoc(collection(db, 'payments'), paymentData);
-      console.log('✅ Payment created:', paymentDocRef.id);
+      await addDoc(collection(db, 'payments'), paymentData);
 
-      // Update booking_status in equipment_requests to "accepted"
+      // 6. Update request_status in equipment_requests to "accepted"
+      console.log('✅ Updating request status...');
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
-        booking_status: 'accepted',
-        payment_id: null,
+        request_status: 'accepted',
         accepted_at: Timestamp.now()
       });
-      console.log('✅ Booking status updated to accepted');
 
-      // Create a new document in the bookings collection
+      // 7. Create a document in the bookings collection
       await addDoc(collection(db, 'bookings'), {
+        booking_id: bookingIdGenerated,
         equipment_id: booking.equipment_id,
-        owner_id: booking.owner_id,
+        owner_id: ownerId,
         customer_id: booking.customer_id,
         customer_name: booking.customer_name || '',
-        equipment_name: booking.equipment_name || '',
+        equipment_name: equipmentData?.name || booking.equipment_name || '',
         location: booking.location || '',
         start_date: booking.start_date,
         end_date: booking.end_date,
-        num_days: numDays,
-        price_per_day: pricePerDay,
-        total_price: calculatedAmount,
+        total_price: amount,
         booking_status: 'accepted',
-        payment_status: 'incomplete',
-        payment_id: null,
+        payment_status: 'completed',
         created_at: Timestamp.now()
       });
-      console.log('✅ Booking record created');
 
-      // Set payment details to display in modal
+      // 8. Show payment details modal
       setPaymentDetails({
         ...paymentData,
-        id: paymentDocRef.id,
-        created_at: now
+        owner_upi_id: ownerUpiId,
+        equipment_details: equipmentData
       });
-
-      showToast('Booking accepted! Payment recorded.', 'success');
+      setShowPaymentModal(true);
+      setShowModal(false);
+      
+      alert('✅ Booking accepted successfully! Payment record created.');
+      fetchBookings(); // Refresh data
     } catch (error) {
-      console.error('Error accepting booking:', error);
-      showToast('Failed to accept booking: ' + error.message, 'error');
+      console.error('❌ Error accepting booking:', error);
+      alert('Failed to accept booking: ' + error.message);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleRejectBooking = async (bookingId) => {
+    // Ask for confirmation
+    const confirmed = window.confirm('Are you sure you want to reject this booking request?');
+    if (!confirmed) return;
+
+    // Ask for rejection reason (optional)
+    const reason = window.prompt('Rejection reason (optional):');
+
     setActionLoading(true);
     try {
-      // Update booking_status in equipment_requests to "rejected"
+      // Update request_status in equipment_requests to "rejected"
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
-        booking_status: 'rejected',
-        rejection_reason: rejectionReason || 'Not specified',
+        request_status: 'rejected',
+        rejection_reason: reason || 'Not specified',
         rejected_at: Timestamp.now()
       });
 
-      showToast('Booking rejected.', 'info');
+      alert('❌ Booking rejected successfully!');
       setShowModal(false);
       setRejectionReason('');
+      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error rejecting booking:', error);
-      showToast('Failed to reject booking: ' + error.message, 'error');
+      alert('Failed to reject booking: ' + error.message);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleCompleteBooking = async (bookingId) => {
+    if (!window.confirm('Mark this booking as completed?')) return;
+    
     setActionLoading(true);
     try {
       const requestRef = doc(db, 'equipment_requests', bookingId);
       await updateDoc(requestRef, {
-        booking_status: 'completed',
-        completed_at: Timestamp.now()
+        request_status: 'completed'
       });
 
-      showToast('Booking marked as completed!', 'success');
+      alert('🎉 Booking marked as completed!');
+      fetchBookings(); // Refresh data
     } catch (error) {
       console.error('Error completing booking:', error);
-      showToast('Failed to complete booking.', 'error');
+      alert('Failed to complete booking');
     } finally {
       setActionLoading(false);
     }
@@ -289,7 +265,6 @@ function Bookings() {
 
   const openBookingModal = (booking) => {
     setSelectedBooking(booking);
-    setPaymentDetails(null); // Reset payment details
     setShowModal(true);
   };
 
@@ -304,21 +279,10 @@ function Bookings() {
     return badges[status] || { class: '', text: status };
   };
 
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    
-    // Handle Firestore Timestamp
-    if (date.toDate && typeof date.toDate === 'function') {
-      date = date.toDate();
-    }
-    
-    // Handle Date object or date string
-    const dateObj = date instanceof Date ? date : new Date(date);
-    
-    // Check if valid date
-    if (isNaN(dateObj.getTime())) return 'N/A';
-    
-    return dateObj.toLocaleDateString('en-IN', { 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-IN', { 
       day: 'numeric', 
       month: 'short', 
       year: 'numeric' 
@@ -327,25 +291,17 @@ function Bookings() {
 
   const calculateDuration = (start, end) => {
     if (!start || !end) return '0 days';
-    
-    // Convert Firestore Timestamps if needed
-    const startDate = start instanceof Date ? start : (start.toDate ? start.toDate() : new Date(start));
-    const endDate = end instanceof Date ? end : (end.toDate ? end.toDate() : new Date(end));
-    
-    // Check if valid dates
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return '0 days';
-    
+    const startDate = new Date(start);
+    const endDate = new Date(end);
     const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     return `${days} day${days !== 1 ? 's' : ''}`;
   };
 
-  // Calculate dynamic stats based on booking_status
   const stats = {
     total: bookings.length,
-    pending: bookings.filter(b => b.booking_status === 'pending' || b.booking_status === 'open').length,
-    accepted: bookings.filter(b => b.booking_status === 'accepted').length,
-    completed: bookings.filter(b => b.booking_status === 'completed').length,
-    rejected: bookings.filter(b => b.booking_status === 'rejected').length
+    pending: bookings.filter(b => b.request_status === 'pending' || b.request_status === 'open').length,
+    accepted: bookings.filter(b => b.request_status === 'accepted').length,
+    completed: bookings.filter(b => b.request_status === 'completed').length
   };
 
   if (loading) {
@@ -433,7 +389,7 @@ function Bookings() {
               className={statusFilter === 'rejected' ? 'active' : ''} 
               onClick={() => setStatusFilter('rejected')}
             >
-              Rejected ({stats.rejected})
+              Rejected
             </button>
           </div>
 
@@ -451,19 +407,22 @@ function Bookings() {
               </div>
             ) : (
               <div className="bookings-grid">
-                {filteredBookings.map(booking => (
+                {filteredBookings.map(booking => {
+                  // Debug: Log the status to console
+                  console.log('🔍 Booking status:', booking.request_status, 'for booking:', booking.id);
+                  
+                  return (
                   <div 
                     key={booking.id} 
-                    className={`booking-card ${booking.booking_status}`}
-                    onClick={() => openBookingModal(booking)}
+                    className={`booking-card ${booking.request_status}`}
                   >
                     <div className="booking-card-header">
                       <div className="equipment-info">
                         <h3>{booking.equipment_name || 'Equipment'}</h3>
                         <p className="equipment-type">📍 {booking.location || 'N/A'}</p>
                       </div>
-                      <span className={`status-badge ${getStatusBadge(booking.booking_status).class}`}>
-                        {getStatusBadge(booking.booking_status).text}
+                      <span className={`status-badge ${getStatusBadge(booking.request_status).class}`}>
+                        {getStatusBadge(booking.request_status).text}
                       </span>
                     </div>
 
@@ -471,14 +430,6 @@ function Bookings() {
                       <div className="detail-row">
                         <span className="label">👤 Customer:</span>
                         <span className="value">{booking.customer_name || 'N/A'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="label">🆔 Customer ID:</span>
-                        <span className="value" style={{fontSize: '0.85em', opacity: 0.8}}>{booking.customer_id || 'N/A'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="label">🔧 Equipment ID:</span>
-                        <span className="value" style={{fontSize: '0.85em', opacity: 0.8}}>{booking.equipment_id || 'N/A'}</span>
                       </div>
                       <div className="detail-row">
                         <span className="label">📅 Dates:</span>
@@ -492,18 +443,17 @@ function Bookings() {
                       </div>
                       <div className="detail-row">
                         <span className="label">💰 Total:</span>
-                        <span className="value price">
-                          {booking.calculated_total != null
-                            ? `₹${booking.calculated_total.toLocaleString()}`
-                            : booking.total_price != null
-                            ? `₹${booking.total_price.toLocaleString()}`
-                            : 'N/A'}
-                        </span>
+                        <span className="value price">₹{booking.total_price?.toLocaleString() || 'N/A'}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="label">📋 Status:</span>
+                        <span className="value">{booking.request_status || 'N/A'}</span>
                       </div>
                     </div>
 
-                    {(booking.booking_status === 'pending' || booking.booking_status === 'open') && (
-                      <div className="booking-actions">
+                    {/* ALWAYS show buttons for pending/open status */}
+                    {(booking.request_status === 'pending' || booking.request_status === 'open') && (
+                      <div className="booking-actions" style={{marginTop: '15px', display: 'flex', gap: '10px'}}>
                         <button 
                           className="btn-accept"
                           onClick={(e) => {
@@ -511,6 +461,17 @@ function Bookings() {
                             handleAcceptBooking(booking.id);
                           }}
                           disabled={actionLoading}
+                          style={{
+                            flex: 1,
+                            padding: '10px 20px',
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                          }}
                         >
                           ✓ Accept
                         </button>
@@ -518,7 +479,18 @@ function Bookings() {
                           className="btn-reject"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openBookingModal(booking);
+                            handleRejectBooking(booking.id);
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '10px 20px',
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
                           }}
                         >
                           ✗ Reject
@@ -526,8 +498,8 @@ function Bookings() {
                       </div>
                     )}
 
-                    {booking.booking_status === 'accepted' && (
-                      <div className="booking-actions">
+                    {booking.request_status === 'accepted' && (
+                      <div className="booking-actions" style={{marginTop: '15px'}}>
                         <button 
                           className="btn-complete"
                           onClick={(e) => {
@@ -535,13 +507,25 @@ function Bookings() {
                             handleCompleteBooking(booking.id);
                           }}
                           disabled={actionLoading}
+                          style={{
+                            width: '100%',
+                            padding: '10px 20px',
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                          }}
                         >
                           ✓ Mark Completed
                         </button>
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -561,14 +545,12 @@ function Bookings() {
               <div className="modal-section">
                 <h3>📍 Equipment Details</h3>
                 <p className="equipment-name">{selectedBooking.equipment_name || 'N/A'}</p>
-                <p><strong>Equipment ID:</strong> {selectedBooking.equipment_id || 'N/A'}</p>
                 <p><strong>Location:</strong> 📍 {selectedBooking.location || 'N/A'}</p>
               </div>
 
               <div className="modal-section">
                 <h3>👤 Customer Information</h3>
                 <p><strong>Name:</strong> {selectedBooking.customer_name || 'N/A'}</p>
-                <p><strong>Customer ID:</strong> {selectedBooking.customer_id || 'N/A'}</p>
               </div>
 
               <div className="modal-section">
@@ -576,45 +558,20 @@ function Bookings() {
                 <p><strong>Start Date:</strong> {formatDate(selectedBooking.start_date)}</p>
                 <p><strong>End Date:</strong> {formatDate(selectedBooking.end_date)}</p>
                 <p><strong>Duration:</strong> {calculateDuration(selectedBooking.start_date, selectedBooking.end_date)}</p>
-                <p><strong>Total Price:</strong> ₹{(selectedBooking.calculated_total ?? selectedBooking.total_price)?.toLocaleString() || 'N/A'}</p>
+                <p><strong>Total Price:</strong> ₹{selectedBooking.total_price?.toLocaleString() || 'N/A'}</p>
               </div>
 
               <div className="modal-section">
-                <h3>ℹ️ Request Information</h3>
-                <p><strong>Request ID:</strong> {selectedBooking.id || 'N/A'}</p>
-                <p><strong>Owner ID:</strong> {selectedBooking.owner_id || 'N/A'}</p>
-                <p><strong>Status:</strong> <span className={`status-badge ${getStatusBadge(selectedBooking.booking_status).class}`}>
-                  {getStatusBadge(selectedBooking.booking_status).text}
+                <h3>ℹ️ Status</h3>
+                <p><strong>Current Status:</strong> <span className={`status-badge ${getStatusBadge(selectedBooking.request_status).class}`}>
+                  {getStatusBadge(selectedBooking.request_status).text}
                 </span></p>
-                {selectedBooking.created_at && (
-                  <p><strong>Created:</strong> {formatDate(selectedBooking.created_at)}</p>
-                )}
                 {selectedBooking.rejection_reason && (
                   <p><strong>Rejection Reason:</strong> {selectedBooking.rejection_reason}</p>
                 )}
               </div>
 
-              {paymentDetails && (
-                <div className="modal-section payment-details-section">
-                  <h3>💳 Payment Details</h3>
-                  <div className="payment-success-banner">
-                    <span className="success-icon">✅</span>
-                    <span>Payment Created Successfully!</span>
-                  </div>
-                  <p><strong>Payment ID:</strong> {paymentDetails.payment_id}</p>
-                  <p><strong>Transaction ID:</strong> {paymentDetails.upi_transaction_id}</p>
-                  <p><strong>Amount:</strong> ₹{paymentDetails.amount?.toLocaleString()}</p>
-                  <p><strong>Payment Method:</strong> {paymentDetails.payment_method}</p>
-                  <p><strong>Payment Status:</strong> <span className="status-badge status-completed">{paymentDetails.payment_status}</span></p>
-                  <p><strong>Customer:</strong> {paymentDetails.customer_name}</p>
-                  <p><strong>Equipment:</strong> {paymentDetails.equipment_name}</p>
-                  {ownerUpiId && <p><strong>Owner UPI ID:</strong> {ownerUpiId}</p>}
-                  <p><strong>Created At:</strong> {paymentDetails.created_at?.toLocaleString?.() || new Date(paymentDetails.created_at).toLocaleString()}</p>
-                  <p><strong>Verified At:</strong> {paymentDetails.verified_at?.toLocaleString?.() || new Date(paymentDetails.verified_at).toLocaleString()}</p>
-                </div>
-              )}
-
-              {(selectedBooking.booking_status === 'pending' || selectedBooking.booking_status === 'open') && (
+              {(selectedBooking.request_status === 'pending' || selectedBooking.request_status === 'open') && (
                 <div className="modal-section">
                   <h3>Reject Booking</h3>
                   <textarea
@@ -628,7 +585,7 @@ function Bookings() {
             </div>
 
             <div className="modal-footer">
-              {(selectedBooking.booking_status === 'pending' || selectedBooking.booking_status === 'open') && (
+              {(selectedBooking.request_status === 'pending' || selectedBooking.request_status === 'open') && (
                 <>
                   <button 
                     className="btn-accept-large"
@@ -646,7 +603,7 @@ function Bookings() {
                   </button>
                 </>
               )}
-              {selectedBooking.booking_status === 'accepted' && (
+              {selectedBooking.status === 'accepted' && (
                 <button 
                   className="btn-complete-large"
                   onClick={() => handleCompleteBooking(selectedBooking.id)}
@@ -663,14 +620,75 @@ function Bookings() {
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`toast toast-${toast.type}`}>
-          <span className="toast-icon">
-            {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
-          </span>
-          <span className="toast-message">{toast.message}</span>
-          <button className="toast-close" onClick={() => setToast(null)}>×</button>
+      {/* Payment Details Modal */}
+      {showPaymentModal && paymentDetails && (
+        <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>💳 Payment Details</h2>
+              <button className="close-btn" onClick={() => setShowPaymentModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div style={{textAlign: 'center', padding: '20px', background: '#d4edda', borderRadius: '8px', marginBottom: '20px'}}>
+                <h3 style={{color: '#155724', margin: '0 0 10px 0'}}>✅ Booking Accepted Successfully!</h3>
+                <p style={{color: '#155724', margin: 0}}>Payment record has been created</p>
+              </div>
+
+              <div className="modal-section">
+                <h3>💰 Payment Information</h3>
+                <p><strong>Payment ID:</strong> {paymentDetails.payment_id}</p>
+                <p><strong>Booking ID:</strong> {paymentDetails.booking_id}</p>
+                <p><strong>Amount:</strong> <span style={{fontSize: '1.2em', color: '#28a745', fontWeight: 'bold'}}>₹{paymentDetails.amount?.toLocaleString()}</span></p>
+                <p><strong>Payment Method:</strong> {paymentDetails.payment_method}</p>
+                <p><strong>UPI Transaction ID:</strong> {paymentDetails.upi_transaction_id}</p>
+                <p><strong>Payment Status:</strong> <span style={{color: '#28a745', fontWeight: 'bold'}}>✓ {paymentDetails.payment_status.toUpperCase()}</span></p>
+              </div>
+
+              <div className="modal-section">
+                <h3>👤 Customer Details</h3>
+                <p><strong>Name:</strong> {paymentDetails.customer_name}</p>
+                <p><strong>Customer ID:</strong> {paymentDetails.customer_id}</p>
+              </div>
+
+              <div className="modal-section">
+                <h3>🚜 Equipment Details</h3>
+                <p><strong>Equipment Name:</strong> {paymentDetails.equipment_name}</p>
+                <p><strong>Equipment ID:</strong> {paymentDetails.equipment_id}</p>
+                {paymentDetails.equipment_details && (
+                  <>
+                    <p><strong>Category:</strong> {paymentDetails.equipment_details.category || 'N/A'}</p>
+                    <p><strong>Description:</strong> {paymentDetails.equipment_details.description || 'N/A'}</p>
+                    {paymentDetails.equipment_details.price_per_day && (
+                      <p><strong>Price per Day:</strong> ₹{paymentDetails.equipment_details.price_per_day.toLocaleString()}</p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="modal-section">
+                <h3>🏦 Owner UPI Details</h3>
+                <p><strong>Owner ID:</strong> {paymentDetails.owner_id}</p>
+                <p><strong>UPI ID:</strong> <span style={{background: '#f0f0f0', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace'}}>{paymentDetails.owner_upi_id}</span></p>
+              </div>
+
+              <div className="modal-section">
+                <h3>📅 Timestamps</h3>
+                <p><strong>Created At:</strong> {paymentDetails.created_at?.toDate ? new Date(paymentDetails.created_at.toDate()).toLocaleString() : 'N/A'}</p>
+                <p><strong>Verified At:</strong> {paymentDetails.verified_at?.toDate ? new Date(paymentDetails.verified_at.toDate()).toLocaleString() : 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn-accept-large" 
+                onClick={() => setShowPaymentModal(false)}
+                style={{width: '100%'}}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

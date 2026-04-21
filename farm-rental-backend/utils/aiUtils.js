@@ -21,7 +21,7 @@ async function generateListing(prompt, imageBase64 = null) {
     const messages = [
       {
         role: "system",
-        content: "You are an expert farm equipment listing writer for tractors, harvesters, rotavators, irrigation pumps etc. Return ONLY valid JSON with no extra text, explanations, markdown, or code blocks: {\"name\": \"string\", \"category\": \"string\", \"description\": \"string\", \"suggestedPricePerDay\": number, \"suggestedPricePerHour\": number|null}"
+        content: "You are an expert farm equipment listing writer for tractors, harvesters, rotavators, irrigation pumps etc. Return ONLY valid JSON with no extra text, explanations, markdown, or code blocks: {\"name\": \"string\", \"category\": \"string\", \"description\": \"string\", \"suggestedPricePerDay\": number, \"suggestedPricePerHour\": number|null, \"location\": \"string\"}"
       },
       { role: "user", content: prompt }
     ];
@@ -52,4 +52,15 @@ async function generateListing(prompt, imageBase64 = null) {
   }
 }
 
-module.exports = { generateListing };
+async function parseEquipmentFromPrompt(message) {
+  const data = await generateListing(message);
+  return {
+    name: data.name,
+    category: data.category,
+    price_per_hour: data.suggestedPricePerHour,
+    price_per_day: data.suggestedPricePerDay,
+    location: data.location
+  };
+}
+
+module.exports = { generateListing, parseEquipmentFromPrompt };
